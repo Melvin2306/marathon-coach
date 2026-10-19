@@ -1,8 +1,8 @@
 // Time series for the Progress page, built from recorded runs and daily health metrics.
 import { addDays, daysBetween, mondayOf } from "./dates";
 import { timeInZones, ZONES } from "./heart";
-import type { DailyValue, Run } from "./types";
-import { vdotFromHeartRate } from "./vdot";
+import type { DailyValue, Plan, Run } from "./types";
+import { HALF, MARATHON, paceAtHeartRate, predictTime, realisticMarathon, vdotFromHeartRate } from "./vdot";
 
 const EPOCH = "2000-01-01";
 /** Dates become day numbers so charts can use a linear x axis. */
@@ -81,4 +81,88 @@ export function median(values: number[]): number | null {
 export function dailyPoints(values: DailyValue[] | undefined, today: string, days: number): Point[] {
   const from = addDays(today, -days);
   return (values ?? []).filter(([d]) => d >= from && d <= today).map(([d, v]) => ({ x: dayNumber(d), y: v }));
+}
+
+const DAY = 1;
+const sumMeters = (runs: Run[], from: string, to: string) => runs.filter((r) => r.date >= from && r.date < to).reduce((s, r) => s + r.distance, 0);
+
+export interface RaceTrendPoint {
+  x: number;
+  /** Vickers & Vertosick realistic time at that week's fitness and mileage */
+  realistic: number;
+  /** VDOT marathon equivalent: what the fitness allows when fully marathon-trained */
+  potential: number;
+}
+
+/**
+ * Week by week: fitness = median per-run estimate of the trailing 4 weeks,
+ * mileage = average of the trailing 4 weeks.
+ */
+export function raceTrend(runs: Run[], estimates: Point[], today: string, weeks: number): RaceTrendPoint[] {
+  const thisMonday = mondayOf(today);
+  const points: RaceTrendPoint[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const end = addDays(thisMonday, 7 - 7 * i);
+    const windowEnd = end > today ? addDays(today, DAY) : end;
+    const from = addDays(windowEnd, -28);
+    const inWindow = estimates.filter((p) => p.x >= dayNumber(from) && p.x < dayNumber(windowEnd)).map((p) => p.y);
+    if (inWindow.length < 2) continue;
+    const vdot = median(inWindow)!;
+    const weekly = sumMeters(runs, from, windowEnd) / 4;
+    points.push({
+      x: dayNumber(addDays(windowEnd, -1)),
+      realistic: realisticMarathon(HALF, predictTime(vdot, HALF), weekly),
+      potential: predictTime(vdot, MARATHON),
+    });
+  }
+  return points;
+}
+
+/** Where the plan leads: target fitness at the planned mileage of the last 4 weeks before the taper. */
+export function raceDayProjection(plan: Plan): { x: number; realistic: number; potential: number } | null {
+  const build = plan.weeks.filter((w) => w.phase !== "taper").slice(-4);
+  const last = plan.weeks.at(-1);
+  if (!build.length || !last) return null;
+  const weekly = build.reduce((s, w) => s + w.volume, 0) / build.length;
+  const raceDay = last.workouts.find((w) => w.type === "race")?.date ?? addDays(last.start, 6);
+  return {
+    x: dayNumber(raceDay),
+    realistic: realisticMarathon(HALF, predictTime(plan.targetVdot, HALF), weekly),
+    potential: predictTime(plan.targetVdot, MARATHON),
+  };
+}
+
+/** A fixed easy heart rate to compare runs at: 75% of max, rounded to 5 bpm. */
+export const referenceHr = (maxHr: number) => Math.round((maxHr * 0.75) / 5) * 5;
+
+/** Each run's pace at the reference heart rate, from its fitness estimate. */
+export function paceAtReference(estimates: Point[], hr: number, maxHr: number): Point[] {
+  return estimates.map((p) => ({ x: p.x, y: Math.round(paceAtHeartRate(p.y, hr, maxHr)) }));
+}
+
+export interface DayTotal {
+  meters: number;
+  runs: number;
+}
+
+export function dailyTotals(runs: Run[]): Map<string, DayTotal> {
+  const map = new Map<string, DayTotal>();
+  for (const r of runs) {
+    const d = map.get(r.date) ?? { meters: 0, runs: 0 };
+    map.set(r.date, { meters: d.meters + r.distance, runs: d.runs + 1 });
+  }
+  return map;
+}
+
+/** Weeks (Monday-based) with at least one run, counted back from this week (or last week if this one is still empty). */
+export function weekStreak(days: Map<string, DayTotal>, today: string): number {
+  const hasRun = (monday: string) => Array.from({ length: 7 }, (_, d) => addDays(monday, d)).some((d) => days.has(d));
+  let monday = mondayOf(today);
+  if (!hasRun(monday)) monday = addDays(monday, -7);
+  let streak = 0;
+  while (hasRun(monday)) {
+    streak++;
+    monday = addDays(monday, -7);
+  }
+  return streak;
 }

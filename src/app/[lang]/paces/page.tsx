@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { resolveLocale, serverT } from "@/i18n/server";
+import { pageMetadata } from "@/i18n/server";
 import { PaceCalculator } from "./pace-calculator";
 
-export async function generateMetadata({ params }: PageProps<"/[lang]/paces">): Promise<Metadata> {
-  return { title: serverT(await resolveLocale(params))("nav.paces") };
+export function generateMetadata({ params }: PageProps<"/[lang]/paces">): Promise<Metadata> {
+  return pageMetadata(params, "/paces", "paces.title", "meta.paces.description");
 }
 
 export default function Page() {

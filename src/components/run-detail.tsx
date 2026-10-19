@@ -6,6 +6,7 @@ import type { MessageKey } from "@/i18n/translate";
 import { formatClock, formatDistance, formatPace } from "@/lib/format";
 import { timeInZones, zoneRanges, ZONES } from "@/lib/heart";
 import { decodePolyline } from "@/lib/polyline";
+import { STRAVA_SYNC } from "@/lib/site";
 import { loadStravaDetail } from "@/lib/strava/client";
 import { SERIES_STEP, type Run, type Units } from "@/lib/types";
 import { LineChart, ShareBar } from "./charts";
@@ -17,7 +18,7 @@ export function RunDetail({ run, units, maxHr }: { run: Run; units: Units; maxHr
   const { t, locale } = useI18n();
   const d = run.details ?? {};
   const [loading, setLoading] = useState(false);
-  const canLoadStrava = !!d.stravaId && !d.stravaDetail;
+  const canLoadStrava = STRAVA_SYNC && !!d.stravaId && !d.stravaDetail;
 
   useEffect(() => {
     if (!canLoadStrava) return;

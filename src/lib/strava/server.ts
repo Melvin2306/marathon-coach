@@ -4,6 +4,7 @@ import "server-only";
 // the client secret never reaches the client.
 import { NextResponse, type NextRequest } from "next/server";
 import type { RawActivity } from "@/lib/import/common";
+import { STRAVA_SYNC } from "@/lib/site";
 import { SERIES_STEP, type RunDetails, type RunKind, type StravaAthlete } from "@/lib/types";
 
 export const SESSION_COOKIE = "strava_session";
@@ -22,6 +23,7 @@ export interface StravaSession {
 }
 
 export function stravaConfig() {
+  if (!STRAVA_SYNC) return null;
   const clientId = process.env.STRAVA_CLIENT_ID;
   const clientSecret = process.env.STRAVA_CLIENT_SECRET;
   return clientId && clientSecret ? { clientId, clientSecret } : null;
@@ -271,6 +273,7 @@ export async function deauthorize(accessToken: string) {
  * 502 when Strava is unavailable. A refreshed token is written back.
  */
 export async function withStrava(request: NextRequest, handler: (session: StravaSession) => Promise<unknown>): Promise<NextResponse> {
+  if (!STRAVA_SYNC) return NextResponse.json({ error: "disabled" }, { status: 404 });
   const stored = readSession(request);
   if (!stored) return NextResponse.json({ error: "not-connected" }, { status: 401 });
   try {

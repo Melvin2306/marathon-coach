@@ -49,10 +49,12 @@ export function deriveFitness(runs: Run[], planStart: string, today: string): De
   if (!data.length) return result;
 
   // Baseline volume and longest run come from before the plan started, so the
-  // plan stays stable as new runs are imported. Requires history covering that window.
+  // plan stays stable as new runs are imported. For a start in the future, the
+  // latest weeks up to today stand in. Requires history covering that window.
+  const anchor = planStart < today ? planStart : today;
   const earliest = data[0].date;
-  if (daysBetween(earliest, planStart) >= 21) {
-    const before = (days: number) => data.filter((r) => r.date < planStart && r.date >= addDays(planStart, -days));
+  if (daysBetween(earliest, anchor) >= 21) {
+    const before = (days: number) => data.filter((r) => r.date < anchor && r.date >= addDays(anchor, -days));
     result.weeklyVolume = before(28).reduce((s, r) => s + r.distance, 0) / 4;
     result.longestRun = Math.max(0, ...before(30).map((r) => r.distance));
   }

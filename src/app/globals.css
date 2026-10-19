@@ -79,21 +79,41 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  /* Shows behind the iOS rubber-band overscroll. */
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  /* Elements scrolled into view (e.g. on focus) stay clear of the sticky header and the phone tab bar. */
+  scroll-padding-top: calc(4rem + env(safe-area-inset-top));
+  scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 48rem) {
+  html {
+    scroll-padding-bottom: 0;
+  }
+}
+
 body {
   background: var(--bg);
   color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  /* No double-tap zoom delay on taps. */
+  touch-action: manipulation;
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
+/* 16px text on phones: iOS zooms into smaller inputs on focus. */
 @utility field {
-  @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25;
+  @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25 md:text-sm;
 }
 
+/* 44px tall on phones, Apple's minimum touch target. */
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50;
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 md:min-h-0;
 }
 
 @utility btn-primary {

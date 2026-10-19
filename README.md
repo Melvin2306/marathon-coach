@@ -1,20 +1,36 @@
-# Marathon Coach
+# M42
+
+M42 is a marathon training coach: a periodised plan to race day, personal paces, imports from Apple Health, Garmin, Strava, Polar, Oura, WHOOP, Fitbit and any watch's FIT/GPX/TCX files, heart-rate zones and treadmill programs, in English and German. The name is the distance (42.195 km); the logo is an "M" drawn as a course profile, two climbs and the finish.
 
 A local-first marathon training app built with Next.js 16 (App Router), React 19 and Tailwind CSS 4.
 
 ## Features
 
+- **Flexible start**: training can start on any date (today, next Monday, a future date, or one in the past if you've already begun). All date pickers start the week on Monday, independent of the browser locale.
 - **Personalised plan**: a periodised plan (Base → Build → Marathon-specific → Taper) generated from your race date, current fitness, weekly volume, days per week and experience. Includes cutback weeks every 4th week, a tune-up half marathon, and a 3-week taper.
 - **Paces that fit you**: training paces (Easy, Marathon, Threshold, Interval, Repetition) from Jack Daniels' VDOT model, progressing gradually toward your goal.
 - **Today dashboard**: countdown, today's workout, this week, race prediction vs goal, and planned-vs-actual training load.
 - **Coach insights**: flags missed or excessive volume, easy runs done too hard, upcoming long-run prep, and offers to recalibrate paces when you log a faster race.
 - **Training log**: log runs with distance, time, effort (RPE) and notes. Click a run to open everything recorded for it: heart rate, cadence, power, stride, ground contact, elevation, weather, time in heart-rate zones, heart-rate / pace / elevation charts, Strava splits, best efforts and route.
-- **Progress**: fitness trend from pace + heart rate, weekly heart-rate zone mix, resting heart rate, HRV and Apple's VO₂max, Strava totals and shoe mileage.
+- **Progress**: "Am I on track?" (realistic marathon time week by week vs. fully-trained potential and your goal, with a projection to race day), a Monday-first consistency calendar, your pace at a fixed easy heart rate, fitness trend from pace + heart rate, weekly heart-rate zone mix, resting heart rate, HRV (SDNN from Apple Watch or overnight RMSSD from Garmin, Oura, WHOOP and Fitbit; never mixed) and the watch's VO₂max.
 - **Treadmill mode**: one Outdoor / Treadmill switch (remembered) turns every workout into a treadmill program: belt speed in km/h or mph, incline and structured steps (warm-up, reps, recoveries, cool-down) with estimated times. Races and the tune-up half stay outdoors.
 - **Workout guide**: every session type explained (what, why, how it should feel), with your current pace and heart-rate range, on the Plan page and per workout.
-- **Data priority**: recorded data wins. Apple Health replaces matching Strava and manual entries, and Strava replaces manual ones. Your effort ratings, notes and run types are kept.
-- **Strava**: connect once and runs sync automatically when the app opens or regains focus (at most every 15 minutes; first sync covers a year). Splits, best efforts and streams load for the newest runs and whenever you open a run. Upload of the Strava bulk export (`activities.csv` or the archive ZIP) also works without an API app.
-- **Apple Health import**: upload the Health app's `export.zip`; it is streamed and parsed entirely in the browser (~130 MB/s). Besides workouts it reads the heart-rate samples recorded during each run, running dynamics, weather metadata and daily resting heart rate, HRV and VO₂max. Runs are deduplicated across sources.
+- **Import from any source**: one drop zone recognises the export by its contents, with step-by-step guides per provider on the Import page. Everything is streamed and parsed in the browser (ZIPs inside ZIPs included); nothing is uploaded.
+
+  | Source | What you upload | Runs | Curves (HR, pace, elevation) | Resting HR / HRV / VO₂max |
+  |---|---|---|---|---|
+  | Apple Health | `export.zip` from the Health app | ✓ | ✓ (watch HR samples + route GPX) | ✓ / SDNN / ✓ |
+  | Garmin Connect | "Export Your Data" ZIP | ✓ | ✓ (original FIT files) | ✓ / RMSSD / ✓ |
+  | Strava | account archive ZIP | ✓ (+ names, perceived exertion) | ✓ (original FIT/GPX/TCX) | – |
+  | Polar Flow | "Download your data" ZIP | ✓ | ✓ (both JSON layouts) | – |
+  | COROS, Suunto, Wahoo, … | `.fit`, `.tcx`, `.gpx` (or `.gz`, or a ZIP of them) | ✓ | ✓ | – |
+  | Oura | Membership Hub export ZIP | ✓ | HR only | ✓ (lowest overnight) / RMSSD / ✓ |
+  | WHOOP | Data Export ZIP | ✓ | averages only | ✓ / RMSSD / – |
+  | Fitbit | Google Takeout ZIP(s) | ✓ | averages only | ✓ / RMSSD / – |
+
+- **Same pipeline for every source**: all recordings become one sample format and go through one summariser, so a run gives the same distance, moving time, heart rate, cadence, elevation gain (30 s smoothing + 2 m hysteresis) and 30-second series whichever file it came from. Accidental recordings (under 300 m, or slower than 20:00 /km) are skipped.
+- **Data priority**: recorded data wins. Original recordings (watch files, Apple Health, Garmin, Polar) replace summaries (Strava without a recording, WHOOP, Oura, Fitbit), and both replace hand-entered runs. The same run arriving twice in one upload is merged into its most detailed copy. Your effort ratings, notes and run types are kept.
+- **Strava account sync** (switched off via `STRAVA_SYNC` in `src/lib/site.ts`): connect once and runs sync automatically. The archive upload above works without it.
 - **English and German**: locale-prefixed routes (`/en`, `/de`), chosen from your browser language and switchable in the nav.
 - **Pace calculator**: VDOT, training paces, equivalent race times and race-day splits.
 - **Your data stays local**: everything is stored in `localStorage`. Export and import backups from Settings.
@@ -58,6 +74,13 @@ The plan and the paces are checked against published data, studies and establish
 - Strength training: framed as improving running economy (Blagrove 2018). Evidence that it prevents running injuries is weak (Wu 2024, Toresdahl 2020).
 - Shoes typically last 500–800 km; sleep at least 7 h (Walsh 2021).
 
+## Brand and SEO
+
+- Logo: `src/components/logo.tsx` (mark + wordmark) and `src/app/icon.svg`; brand orange `#eb6834`.
+- Icons: `favicon.ico` (16/32/48 px), `icon.svg`, `apple-icon.png` and PWA icons in `public/icons/` (incl. maskable), all rendered from the same mark.
+- Metadata: localized titles and descriptions, canonical URLs and `hreflang` alternates per page, Open Graph and Twitter cards with a generated share image per language (`src/app/[lang]/opengraph-image.tsx`), JSON-LD `WebApplication`, `manifest.webmanifest`, `robots.txt` and `sitemap.xml`.
+- Production builds use `https://m42.rinkleff.dev` for canonical links, the sitemap and share images; set `NEXT_PUBLIC_SITE_URL` only to override it (e.g. for preview deployments).
+
 ## Development
 
 ```bash
@@ -65,9 +88,16 @@ npm install
 npm run dev     # http://localhost:3000
 npm run build
 npm run lint
+npm test        # import tests (vitest)
 ```
 
-## Strava sync (optional)
+## Tests
+
+`tests/` checks every importer against the same synthetic 50-minute run (`tests/fixtures/canonical.ts`), written into each provider's real export layout: file names, folder structure, headers, units, time zones and quirks such as Strava's duplicate `Distance` columns and UTC dates, Oura's semicolon CSV with short rows, Polar's bare `NaN` and two JSON layouts, Fitbit's two-digit-year UTC timestamps, Garmin's nested upload ZIPs and localized Apple Health file names. FIT fixtures are encoded with Garmin's official SDK (`@garmin/fitsdk`, a dev dependency only) and decoded by the MIT-licensed `fit-file-parser` the app ships. Each source must report the same date, start time, distance, duration and heart rate, and curves where the source records them.
+
+## Strava sync (optional, off by default)
+
+Set `STRAVA_SYNC = true` in `src/lib/site.ts`, then:
 
 1. Create an API application at https://www.strava.com/settings/api. Set **Authorization Callback Domain** to `localhost` (or your deployed host).
 2. Copy `.env.example` to `.env.local` and fill in `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET`.
@@ -81,7 +111,8 @@ The app requests `read,activity:read_all,profile:read_all` (profile access enabl
 - `src/lib/vdot.ts`: VDOT model, pace and race-time prediction
 - `src/lib/coach.ts`: coaching insights from the plan and the run log
 - `src/lib/store.ts`: localStorage-backed store (`useSyncExternalStore`)
-- `src/lib/import/*`: Strava CSV and Apple Health parsers, streaming ZIP reader, dedupe
+- `src/lib/import/importer.ts`: recognises each export by its file paths and runs the matching parser; `samples.ts` is the shared summariser; one file per provider (`apple-health.ts`, `garmin.ts`, `strava-csv.ts`, `polar.ts`, `oura.ts`, `whoop.ts`, `fitbit.ts`, `fit.ts`, `activity-files.ts` for GPX/TCX); `files.ts` streams ZIPs
+- `src/content/import-guides.ts`: per-provider export instructions shown on the Import page
 - `src/lib/strava/server.ts`: Strava OAuth and API client (server only)
 - `src/i18n/*`: locale config, message catalogs (`messages/en.ts`, `messages/de.ts`), translation helpers
 - `src/proxy.ts`: redirects locale-less URLs to `/en` or `/de`

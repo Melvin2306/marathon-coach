@@ -38,6 +38,8 @@ export interface Series {
   points: { x: number; y: number }[];
   /** dots for individual observations, line for trends */
   mark: "line" | "dots";
+  /** dashed line, e.g. for a projection */
+  dash?: boolean;
 }
 
 export interface RefLine {
@@ -96,7 +98,7 @@ export function LineChart({
 
   return (
     <div ref={ref} className="relative">
-      {series.length > 1 && <Legend items={series.map((s) => ({ label: s.label, color: s.color, mark: s.mark }))} />}
+      {series.length > 1 && <Legend items={series.map((s) => ({ label: s.label, color: s.color, mark: s.dash ? "dash" : s.mark }))} />}
       <svg viewBox={`0 0 ${W} ${height}`} className="w-full touch-none" role="img" aria-label={ariaLabel} onMouseMove={onMove} onMouseLeave={() => setHoverX(null)}>
         {ticks.map((t) => (
           <g key={t}>
@@ -127,6 +129,7 @@ export function LineChart({
               fill="none"
               stroke={s.color}
               strokeWidth={2}
+              strokeDasharray={s.dash ? "6 5" : undefined}
               strokeLinejoin="round"
               strokeLinecap="round"
             />
@@ -272,13 +275,15 @@ export function ShareBar({ values, colors, labels, format }: { values: number[];
   );
 }
 
-function Legend({ items }: { items: { label: string; color: string; mark: "line" | "dots" | "bar" }[] }) {
+function Legend({ items }: { items: { label: string; color: string; mark: "line" | "dash" | "dots" | "bar" }[] }) {
   return (
     <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
       {items.map((it) => (
         <span key={it.label} className="flex items-center gap-1.5">
           {it.mark === "line" ? (
             <span className="h-0.5 w-3 rounded" style={{ background: it.color }} />
+          ) : it.mark === "dash" ? (
+            <span className="w-3 border-t-2 border-dashed" style={{ borderColor: it.color }} />
           ) : (
             <span className={`size-2.5 ${it.mark === "dots" ? "rounded-full" : "rounded-sm"}`} style={{ background: it.color }} />
           )}
@@ -296,6 +301,108 @@ function Tooltip({ leftPct, children }: { leftPct: number; children: React.React
       style={{ left: `clamp(0px, calc(${leftPct}% - 80px), calc(100% - 170px))` }}
     >
       {children}
+    </div>
+  );
+}
+
+export interface CalendarDay {
+  /** ISO date */
+  date: string;
+  value: number;
+}
+
+/**
+ * GitHub-style activity calendar: one column per week, Monday at the top.
+ * `bins` are the lower bounds of each color step (value > 0).
+ */
+export function CalendarHeatmap({
+  weeks,
+  colors,
+  bins,
+  weekdayLabels,
+  monthLabel,
+  formatTooltip,
+  ariaLabel,
+  legendLess,
+  legendMore,
+}: {
+  /** columns of 7 days, Monday first; null for days after today */
+  weeks: (CalendarDay | null)[][];
+  colors: string[];
+  bins: number[];
+  weekdayLabels: string[];
+  monthLabel: (date: string) => string | null;
+  formatTooltip: (day: CalendarDay) => string;
+  ariaLabel: string;
+  legendLess: string;
+  legendMore: string;
+}) {
+  const [ref, W] = useWidth();
+  const [hover, setHover] = useState<CalendarDay | null>(null);
+  const left = 28;
+  const top = 16;
+  const gap = 2;
+  const cell = Math.max(6, Math.min(16, Math.floor((W - left) / weeks.length) - gap));
+  const height = top + 7 * (cell + gap);
+  const colorFor = (v: number) => {
+    if (v <= 0) return "var(--surface-2)";
+    let k = 0;
+    for (let i = 0; i < bins.length; i++) if (v >= bins[i]) k = i;
+    return colors[k];
+  };
+  const hoverPos = hover
+    ? (() => {
+        const wi = weeks.findIndex((w) => w.some((d) => d?.date === hover.date));
+        return ((left + wi * (cell + gap)) / W) * 100;
+      })()
+    : 0;
+
+  return (
+    <div ref={ref} className="relative">
+      <svg viewBox={`0 0 ${W} ${height}`} className="w-full" role="img" aria-label={ariaLabel} onMouseLeave={() => setHover(null)}>
+        {weekdayLabels.map((l, d) =>
+          d % 2 === 0 ? (
+            <text key={d} x={0} y={top + d * (cell + gap) + cell / 2} dy="0.32em" fontSize="9" fill="var(--muted)">
+              {l}
+            </text>
+          ) : null,
+        )}
+        {weeks.map((week, wi) => {
+          const label = week[0] ? monthLabel(week[0].date) : null;
+          return (
+            <g key={wi}>
+              {label && (
+                <text x={left + wi * (cell + gap)} y={10} fontSize="9" fill="var(--muted)">
+                  {label}
+                </text>
+              )}
+              {week.map((day, d) =>
+                day ? (
+                  <rect
+                    key={d}
+                    x={left + wi * (cell + gap)}
+                    y={top + d * (cell + gap)}
+                    width={cell}
+                    height={cell}
+                    rx={2}
+                    fill={colorFor(day.value)}
+                    stroke={hover?.date === day.date ? "var(--text)" : "none"}
+                    onMouseEnter={() => setHover(day)}
+                  />
+                ) : null,
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="mt-2 flex items-center justify-end gap-1 text-xs text-muted">
+        {legendLess}
+        {["var(--surface-2)", ...colors].map((c) => (
+          <span key={c} className="size-2.5 rounded-sm" style={{ background: c }} />
+        ))}
+        {legendMore}
+      </div>
+      {hover && <Tooltip leftPct={hoverPos}>{formatTooltip(hover)}</Tooltip>}
     </div>
   );
 }

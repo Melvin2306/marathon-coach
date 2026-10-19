@@ -3,19 +3,38 @@
 import Link from "next/link";
 import { useI18n } from "@/i18n/client";
 import type { MessageKey } from "@/i18n/translate";
-import { formatDate, todayISO } from "@/lib/dates";
+import { addDays, formatDate, mondayOf, todayISO, weekdayName } from "@/lib/dates";
 import { observedMaxHr } from "@/lib/fitness";
-import { formatClock, formatDistance } from "@/lib/format";
+import { formatClock, formatDistance, formatPace } from "@/lib/format";
 import { zoneRanges, ZONES } from "@/lib/heart";
-import { dailyPoints, dayToISO, easyShare, fitnessPoints, median, rollingMean, rollingMedian, weeklyZones } from "@/lib/progress";
+import {
+  dailyPoints,
+  dailyTotals,
+  dayToISO,
+  easyShare,
+  fitnessPoints,
+  median,
+  paceAtReference,
+  raceDayProjection,
+  raceTrend,
+  referenceHr,
+  rollingMean,
+  rollingMedian,
+  weeklyZones,
+  weekStreak,
+} from "@/lib/progress";
 import { useAppData, usePlan } from "@/lib/store";
-import type { StravaAthlete, Units } from "@/lib/types";
+import type { Run, StravaAthlete, Units } from "@/lib/types";
 import { MARATHON, predictTime } from "@/lib/vdot";
-import { LineChart, StackedColumns } from "@/components/charts";
+import { CalendarHeatmap, LineChart, StackedColumns, type CalendarDay } from "@/components/charts";
 import { ZONE_COLORS } from "@/components/run-detail";
 import { Card, NeedsSetup, Skeleton, Stat } from "@/components/ui";
 
 const ZONE_WEEKS = 16;
+const TREND_WEEKS = 26;
+const CALENDAR_WEEKS = 52;
+/** Calendar color steps by distance per day, in km. */
+const CALENDAR_BINS_KM = [0.1, 5, 10, 15, 20];
 /** Shoes are typically worn out at 500–800 km. */
 const SHOE_WARN_METERS = 600_000;
 
@@ -40,11 +59,22 @@ export function ProgressView() {
   const ranges = maxHr ? zoneRanges(maxHr) : null;
   const zoneLabels = ZONES.map((z, i) => `${t(`zone.${z}` as MessageKey)}${ranges ? ` ${ranges[i][0]}–${ranges[i][1]}` : ""}`);
   const resting = dailyPoints(health?.restingHr, today, 120);
-  const hrv = dailyPoints(health?.hrv, today, 120);
+  // SDNN (Apple Watch) and RMSSD (Garmin, Oura, WHOOP, Fitbit) aren't comparable, so only one is charted: the one measured most recently.
+  const sdnn = dailyPoints(health?.hrv, today, 120);
+  const rmssd = dailyPoints(health?.hrvRmssd, today, 120);
+  const hrvKind = (rmssd.at(-1)?.x ?? -Infinity) > (sdnn.at(-1)?.x ?? -Infinity) ? "rmssd" : "sdnn";
+  const hrv = hrvKind === "rmssd" ? rmssd : sdnn;
   const vo2 = dailyPoints(health?.vo2max, today, 365);
   const lastResting = rollingMean(resting, 7).at(-1);
   const restingMedian = median(resting.map((p) => p.y));
   const hrvMedian = median(hrv.map((p) => p.y));
+  const trend26 = raceTrend(runs, estimates, today, TREND_WEEKS);
+  const projection = raceDayProjection(plan);
+  const refHr = maxHr ? referenceHr(maxHr) : null;
+  const refPaces = maxHr && refHr ? paceAtReference(estimates, refHr, maxHr) : [];
+  const refTrend = rollingMedian(refPaces, 28);
+  const refNow = refTrend.at(-1);
+  const refBefore = refNow ? [...refTrend].reverse().find((p) => p.x <= refNow.x - 56) : undefined;
   const hasHeartData = estimates.length > 0 || zoneWeeks.some((w) => w.minutes.some((m) => m > 0)) || resting.length > 0;
 
   return (
@@ -83,6 +113,61 @@ export function ProgressView() {
           hint={t("progress.easyShareHint")}
         />
       </div>
+
+      {trend26.length > 0 && (
+        <Card title={t("progress.onTrack")}>
+          <OnTrackSummary goal={profile.goalTime} latest={trend26[trend26.length - 1].realistic} projected={projection?.realistic ?? null} />
+          <LineChart
+            invertY
+            ariaLabel={t("progress.onTrack")}
+            series={[
+              { id: "realistic", label: t("progress.realistic"), color: "var(--series-1)", mark: "line", points: trend26.map((p) => ({ x: p.x, y: p.realistic })) },
+              { id: "potential", label: t("progress.potential"), color: "var(--muted)", mark: "line", points: trend26.map((p) => ({ x: p.x, y: p.potential })) },
+              ...(projection
+                ? [
+                    {
+                      id: "projection",
+                      label: t("progress.projection"),
+                      color: "var(--series-1)",
+                      mark: "line" as const,
+                      dash: true,
+                      points: [{ x: trend26[trend26.length - 1].x, y: trend26[trend26.length - 1].realistic }, { x: projection.x, y: projection.realistic }],
+                    },
+                  ]
+                : []),
+            ]}
+            refLines={profile.goalTime ? [{ y: profile.goalTime, label: t("progress.goalLine", { time: formatClock(profile.goalTime) }) }] : []}
+            formatX={fmtDay}
+            formatY={(y) => formatClock(y).replace(/:\d\d$/, "")}
+          />
+          <p className="mt-2 text-xs text-muted">{t("progress.onTrackNote")}</p>
+        </Card>
+      )}
+
+      <ConsistencyCalendar runs={runs} today={today} units={units} />
+
+      {refPaces.length > 0 && refHr && (
+        <Card title={t("progress.paceAtHr", { hr: refHr })}>
+          <p className="mb-3 text-sm text-ink-2">
+            {t("progress.paceAtHrBody", { hr: refHr })}{" "}
+            {refNow && refBefore && (
+              <span className="font-medium text-ink">
+                {t(refNow.y <= refBefore.y ? "progress.paceAtHrFaster" : "progress.paceAtHrSlower", { sec: Math.abs(Math.round(refBefore.y - refNow.y)) })}
+              </span>
+            )}
+          </p>
+          <LineChart
+            invertY
+            ariaLabel={t("progress.paceAtHr", { hr: refHr })}
+            series={[
+              { id: "runs", label: t("progress.perRun"), color: "var(--z2)", mark: "dots", points: refPaces },
+              { id: "trend", label: t("progress.trend"), color: "var(--series-1)", mark: "line", points: refTrend },
+            ]}
+            formatX={fmtDay}
+            formatY={(y) => formatPace(y, units)}
+          />
+        </Card>
+      )}
 
       {estimates.length > 0 && (
         <Card title={t("progress.fitnessTrend")}>
@@ -136,7 +221,9 @@ export function ProgressView() {
           )}
           {hrv.length > 0 && (
             <Card title={t("progress.hrvTitle")}>
-              <p className="mb-3 text-sm text-ink-2">{t("progress.hrvBody")}</p>
+              <p className="mb-3 text-sm text-ink-2">
+                {t("progress.hrvBody")} <span className="text-muted">{t(hrvKind === "rmssd" ? "progress.hrvRmssd" : "progress.hrvSdnn")}</span>
+              </p>
               <LineChart
                 height={180}
                 ariaLabel={t("progress.hrvTitle")}
@@ -168,6 +255,68 @@ export function ProgressView() {
 
       {strava?.athlete && <StravaProfile athlete={strava.athlete} units={units} />}
     </div>
+  );
+}
+
+function OnTrackSummary({ goal, latest, projected }: { goal: number | null; latest: number; projected: number | null }) {
+  const { t } = useI18n();
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <Stat label={t("progress.realisticNow")} value={formatClock(latest)} />
+      {projected !== null && <Stat label={t("progress.projectedRaceDay")} value={formatClock(projected)} hint={t("progress.projectedHint")} />}
+      {goal && (
+        <Stat
+          label={t("dash.goal")}
+          value={formatClock(goal)}
+          hint={projected !== null ? t(projected <= goal ? "progress.onTrackYes" : "progress.onTrackGap", { gap: formatClock(Math.abs(projected - goal)) }) : undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConsistencyCalendar({ runs, today, units }: { runs: Run[]; today: string; units: Units }) {
+  const { t, locale } = useI18n();
+  const totals = dailyTotals(runs);
+  if (!totals.size) return null;
+  const first = addDays(mondayOf(today), -7 * (CALENDAR_WEEKS - 1));
+  const weeks = Array.from({ length: CALENDAR_WEEKS }, (_, w) =>
+    Array.from({ length: 7 }, (_, d): CalendarDay | null => {
+      const date = addDays(first, w * 7 + d);
+      return date > today ? null : { date, value: (totals.get(date)?.meters ?? 0) / 1000 };
+    }),
+  );
+  const inRange = [...totals.entries()].filter(([d]) => d >= first && d <= today);
+  const activeWeeks = weeks.filter((w) => w.some((d) => d && d.value > 0)).length;
+  const meters = inRange.reduce((s, [, v]) => s + v.meters, 0);
+  const runCount = inRange.reduce((s, [, v]) => s + v.runs, 0);
+  return (
+    <Card title={t("progress.calendar")}>
+      <p className="mb-3 text-sm text-ink-2">
+        {t("progress.calendarStats", {
+          runs: runCount,
+          dist: formatDistance(meters, units, 0, locale),
+          active: activeWeeks,
+          total: CALENDAR_WEEKS,
+          streak: weekStreak(totals, today),
+        })}
+      </p>
+      <CalendarHeatmap
+        weeks={weeks}
+        colors={ZONE_COLORS}
+        bins={CALENDAR_BINS_KM}
+        weekdayLabels={[0, 1, 2, 3, 4, 5, 6].map((d) => weekdayName(d, locale, "short").slice(0, 2))}
+        monthLabel={(date) => (Number(date.slice(8)) <= 7 ? formatDate(date, { month: "short" }, locale) : null)}
+        formatTooltip={(day) =>
+          `${formatDate(day.date, { weekday: "short", day: "numeric", month: "short" }, locale)} · ${
+            day.value > 0 ? formatDistance(day.value * 1000, units, 1, locale) : t("progress.restDay")
+          }`
+        }
+        ariaLabel={t("progress.calendar")}
+        legendLess={t("progress.less")}
+        legendMore={t("progress.more")}
+      />
+    </Card>
   );
 }
 

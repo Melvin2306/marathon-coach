@@ -99,6 +99,14 @@ export function Dashboard() {
               ))}
             </ul>
           </Card>
+
+          <Card title={t("dash.coach")}>
+            <ul className="space-y-4">
+              {insights.map((insight) => (
+                <InsightItem key={insight.id} insight={insight} profile={profile} />
+              ))}
+            </ul>
+          </Card>
         </div>
 
         <div className="space-y-6 lg:col-span-2">
@@ -138,13 +146,6 @@ export function Dashboard() {
             <PaceGuide profile={profile} plan={plan} weekIndex={currentIndex} />
           </Card>
 
-          <Card title={t("dash.coach")}>
-            <ul className="space-y-4">
-              {insights.map((insight) => (
-                <InsightItem key={insight.id} insight={insight} profile={profile} />
-              ))}
-            </ul>
-          </Card>
         </div>
       </div>
 

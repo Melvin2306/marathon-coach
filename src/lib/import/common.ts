@@ -10,6 +10,8 @@ export interface ImportedRun extends Omit<Run, "id"> {
 export interface RawActivity {
   externalId: string;
   source: RunSource;
+  /** epoch ms of the start, when known; used to match the same run across files */
+  start?: number;
   /** ISO date in the runner's local time */
   date: string;
   distance: number;
@@ -62,7 +64,22 @@ export function toRuns(activities: RawActivity[], plan: Plan | null, since: stri
  * Measured data beats typed data: an Apple Health workout replaces a matching
  * Strava or manual entry, and a Strava activity replaces a manual one.
  */
-export const SOURCE_PRIORITY: Record<RunSource, number> = { manual: 0, strava: 1, "apple-health": 2 };
+export const SOURCE_PRIORITY: Record<RunSource, number> = {
+  manual: 0,
+  // Workout summaries without the original recording.
+  strava: 1,
+  whoop: 1,
+  fitbit: 1,
+  oura: 1,
+  // Original recordings from the device.
+  "apple-health": 2,
+  garmin: 2,
+  polar: 2,
+  coros: 2,
+  suunto: 2,
+  wahoo: 2,
+  file: 2,
+};
 
 const sourceOf = (run: Pick<Run, "source">): RunSource => run.source ?? "manual";
 

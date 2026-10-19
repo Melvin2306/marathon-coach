@@ -12,6 +12,7 @@ import { formatClock, formatDistance, formatPace, parseClock, parseDecimal, unit
 import { addRun, deleteRun, useAppData, usePlan } from "@/lib/store";
 import type { Plan, Profile, RunKind, RunSource } from "@/lib/types";
 import { observedMaxHr } from "@/lib/fitness";
+import { DateField } from "@/components/date-field";
 import { RunDetail } from "@/components/run-detail";
 import { Card, NeedsSetup, Skeleton } from "@/components/ui";
 
@@ -144,10 +145,16 @@ function LogForm({ profile, plan, prefill }: { profile: Profile; plan: Plan; pre
     <Card title={t("log.form.title")}>
       <form onSubmit={submit} className="space-y-4" onChange={() => setSaved(null)}>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium">{t("log.form.date")}</span>
-            <input type="date" className="field" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} required />
-          </label>
+          <div>
+            <label htmlFor="run-date" className="mb-1.5 block text-sm font-medium">
+              {t("log.form.date")}
+            </label>
+            <DateField id="run-date" value={date} max={todayISO()} onChange={(iso) => {
+                setDate(iso);
+                setSaved(null);
+              }}
+            />
+          </div>
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium">{t("log.form.type")}</span>
             <select className="field" value={kind} onChange={(e) => setKind(e.target.value as RunKind)}>

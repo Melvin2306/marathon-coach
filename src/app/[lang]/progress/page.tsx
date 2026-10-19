@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { resolveLocale, serverT } from "@/i18n/server";
+import { pageMetadata } from "@/i18n/server";
 import { ProgressView } from "./progress-view";
 
-export async function generateMetadata({ params }: PageProps<"/[lang]/progress">): Promise<Metadata> {
-  return { title: serverT(await resolveLocale(params))("nav.progress") };
+export function generateMetadata({ params }: PageProps<"/[lang]/progress">): Promise<Metadata> {
+  return pageMetadata(params, "/progress", "nav.progress", "meta.progress.description");
 }
 
 export default function Page() {

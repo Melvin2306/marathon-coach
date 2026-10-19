@@ -34,7 +34,8 @@ export interface Profile {
 
 export type RunKind = "easy" | "long" | "workout" | "race" | "other";
 
-export type RunSource = "manual" | "strava" | "apple-health";
+/** Where a run came from; recorded sources outrank Strava, which outranks manual entries. */
+export type RunSource = "manual" | "strava" | "apple-health" | "garmin" | "polar" | "coros" | "suunto" | "wahoo" | "fitbit" | "whoop" | "oura" | "file";
 
 export interface Run {
   id: string;
@@ -133,12 +134,14 @@ export interface RunDetails {
 /** [ISO date, value] */
 export type DailyValue = [string, number];
 
-/** Daily health metrics from Apple Health. */
+/** Daily health metrics from Apple Health, Garmin, Oura, WHOOP and Fitbit. */
 export interface HealthMetrics {
   restingHr: DailyValue[];
-  /** heart rate variability, SDNN in ms */
+  /** heart rate variability, SDNN in ms (Apple Health) */
   hrv: DailyValue[];
-  /** Apple's cardio fitness estimate, ml/kg/min */
+  /** heart rate variability, RMSSD in ms (Garmin, Oura, WHOOP, Fitbit); not comparable with SDNN */
+  hrvRmssd?: DailyValue[];
+  /** the device's VO2max / cardio fitness estimate, ml/kg/min */
   vo2max: DailyValue[];
 }
 

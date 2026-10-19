@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui";
-import { resolveLocale, serverT } from "@/i18n/server";
+import { pageMetadata } from "@/i18n/server";
 import { ImportView } from "./import-view";
 
-export async function generateMetadata({ params }: PageProps<"/[lang]/import">): Promise<Metadata> {
-  return { title: serverT(await resolveLocale(params))("nav.import") };
+export function generateMetadata({ params }: PageProps<"/[lang]/import">): Promise<Metadata> {
+  return pageMetadata(params, "/import", "import.title");
 }
 
 export default function Page() {

@@ -1,11 +1,11 @@
-// Reads an Apple Health export (export.zip from the Health app, or the
-// export.xml inside it) as a stream. One pass picks out running workouts with
-// their summary statistics, the heart-rate samples recorded during them, and
-// daily resting heart rate, HRV and VO2max. Everything else is skipped unparsed.
+// Apple Health export (export.zip from the Health app). The main XML is read
+// as a stream: running workouts with their statistics and metadata, the
+// heart-rate samples recorded during them, and daily resting heart rate, HRV
+// and VO2max. Workout routes (GPX) add pace and elevation curves.
 import type { DailyValue, HealthMetrics, RunDetails } from "../types";
-import { SERIES_STEP } from "../types";
+import { gpxPoints, toActivity } from "./activity-files";
 import type { RawActivity } from "./common";
-import { streamText, type Progress } from "./files";
+import type { Sample } from "./samples";
 
 const UNIT_METERS: Record<string, number> = { km: 1000, m: 1, mi: 1609.344, ft: 0.3048, yd: 0.9144, cm: 0.01 };
 const UNIT_SECONDS: Record<string, number> = { min: 60, s: 1, sec: 1, hr: 3600, h: 3600 };
@@ -22,7 +22,6 @@ export function parseHealthDate(value: string): number {
   return m ? Date.parse(`${m[1]}T${m[2]}${m[3]}:${m[4]}`) : NaN;
 }
 
-/** "2560 cm" → meters; "59 degF" → °C; "6500 %" → percent (Apple stores it ×100). */
 function metadataValue(element: string, key: string): string | undefined {
   return element.match(new RegExp(`<MetadataEntry key="${key}" value="([^"]*)"`))?.[1];
 }
@@ -34,63 +33,64 @@ function temperatureC(value: string | undefined): number | undefined {
   return Math.round((m[2] === "F" ? ((v - 32) * 5) / 9 : v) * 10) / 10;
 }
 
-export interface ParsedWorkout extends RawActivity {
-  /** epoch ms, for matching heart-rate samples */
+/** The main XML is export.xml in English and localized elsewhere (e.g. 导出.xml); export_cda.xml is clinical data. */
+export const isAppleExportXml = (name: string) => /(^|\/)apple_health_export\/[^/]+\.xml$/i.test(name) && !/export_cda\.xml$/i.test(name);
+export const isAppleRoute = (name: string) => /(^|\/)workout-routes\/[^/]+\.gpx$/i.test(name);
+
+/** A running workout as stated in the export, before samples are attached. */
+export interface AppleWorkout {
+  startDate: string;
   startMs: number;
   endMs: number;
+  distance: number;
+  duration: number;
+  avgHr?: number;
+  maxHr?: number;
+  indoor: boolean;
+  routePath?: string;
+  details: RunDetails;
 }
 
 /** Parses one <Workout ...>...</Workout> element. */
-export function parseWorkout(element: string): ParsedWorkout | null {
+export function parseWorkout(element: string): AppleWorkout | null {
   const open = element.slice(0, element.indexOf(">") + 1);
   const a = attributes(open);
   if (a.workoutActivityType !== "HKWorkoutActivityTypeRunning" || !a.startDate) return null;
 
   const duration = Number(a.duration) * (UNIT_SECONDS[a.durationUnit ?? "min"] ?? 60);
-  // Older exports carry totals on the workout; iOS 16+ moved them into WorkoutStatistics children.
+  // iOS 16+ nests per-part statistics in <WorkoutActivity>; the workout's own totals are outside them.
+  const parts = [...element.matchAll(/<WorkoutActivity\b[\s\S]*?<\/WorkoutActivity>/g)].map((m) => m[0]);
+  const totalsXml = element.replace(/<WorkoutActivity\b[\s\S]*?<\/WorkoutActivity>/g, "");
+  const stats = (xml: string) => [...xml.matchAll(/<WorkoutStatistics\b[^>]*>/g)].map((m) => attributes(m[0]));
+  const totals = stats(totalsXml);
+  const partStats = parts.flatMap(stats);
+  const find = (type: string) => totals.find((s) => s.type === `HKQuantityTypeIdentifier${type}`);
+  // Older exports carry totals as attributes on <Workout>.
   let distance = a.totalDistance ? Number(a.totalDistance) * (UNIT_METERS[a.totalDistanceUnit ?? "km"] ?? 1000) : 0;
-  let avgHr: number | undefined;
-  let maxHr: number | undefined;
-  const details: RunDetails = {};
-  if (a.totalEnergyBurned) details.calories = Math.round(Number(a.totalEnergyBurned));
-  let steps = 0;
-
-  for (const m of element.matchAll(/<WorkoutStatistics\b[^>]*>/g)) {
-    const s = attributes(m[0]);
-    const avg = Number(s.average) || undefined;
-    switch (s.type) {
-      case "HKQuantityTypeIdentifierDistanceWalkingRunning":
-        if (!distance && s.sum) distance = Number(s.sum) * (UNIT_METERS[s.unit ?? "km"] ?? 1000);
-        break;
-      case "HKQuantityTypeIdentifierHeartRate":
-        avgHr = avg;
-        maxHr = Number(s.maximum) || undefined;
-        break;
-      case "HKQuantityTypeIdentifierActiveEnergyBurned":
-        if (s.sum) details.calories = Math.round(Number(s.sum));
-        break;
-      case "HKQuantityTypeIdentifierStepCount":
-        steps = Number(s.sum) || 0;
-        break;
-      case "HKQuantityTypeIdentifierRunningPower":
-        if (avg) details.power = Math.round(avg);
-        break;
-      case "HKQuantityTypeIdentifierRunningStrideLength":
-        if (avg) details.strideLength = Math.round(avg * (UNIT_METERS[s.unit ?? "m"] ?? 1) * 100) / 100;
-        break;
-      case "HKQuantityTypeIdentifierRunningGroundContactTime":
-        if (avg) details.groundContact = Math.round(avg);
-        break;
-      case "HKQuantityTypeIdentifierRunningVerticalOscillation":
-        if (avg) details.verticalOscillation = Math.round(avg * 10) / 10;
-        break;
-      case "HKQuantityTypeIdentifierRunningSpeed":
-        if (s.maximum) details.maxSpeed = Number(s.maximum) * (s.unit === "km/hr" ? 1 / 3.6 : 1);
-        break;
-    }
+  const distStat = find("DistanceWalkingRunning");
+  if (!distance && distStat?.sum) distance = Number(distStat.sum) * (UNIT_METERS[distStat.unit ?? "km"] ?? 1000);
+  if (!distance) {
+    distance = partStats
+      .filter((s) => s.type === "HKQuantityTypeIdentifierDistanceWalkingRunning" && s.sum)
+      .reduce((sum, s) => sum + Number(s.sum) * (UNIT_METERS[s.unit ?? "km"] ?? 1000), 0);
   }
   if (!(distance > 0) || !(duration > 0)) return null;
+
+  const details: RunDetails = {};
+  const hr = find("HeartRate");
+  const energy = find("ActiveEnergyBurned");
+  if (energy?.sum) details.calories = Math.round(Number(energy.sum) * (energy.unit === "kJ" ? 1 / 4.184 : 1));
+  else if (a.totalEnergyBurned) details.calories = Math.round(Number(a.totalEnergyBurned));
+  const steps = Number(find("StepCount")?.sum) || 0;
   if (steps) details.cadence = Math.round(steps / (duration / 60));
+  const avg = (type: string) => Number(find(type)?.average) || undefined;
+  if (avg("RunningPower")) details.power = Math.round(avg("RunningPower")!);
+  const stride = find("RunningStrideLength");
+  if (stride?.average) details.strideLength = Math.round(Number(stride.average) * (UNIT_METERS[stride.unit ?? "m"] ?? 1) * 100) / 100;
+  if (avg("RunningGroundContactTime")) details.groundContact = Math.round(avg("RunningGroundContactTime")!);
+  if (avg("RunningVerticalOscillation")) details.verticalOscillation = Math.round(avg("RunningVerticalOscillation")! * 10) / 10;
+  const speed = find("RunningSpeed");
+  if (speed?.maximum) details.maxSpeed = Number(speed.maximum) * (speed.unit === "km/hr" ? 1 / 3.6 : speed.unit === "mi/hr" ? 0.44704 : 1);
 
   const elevation = metadataValue(element, "HKElevationAscended")?.match(/^([\d.]+) (\w+)$/);
   if (elevation) details.elevationGain = Math.round(Number(elevation[1]) * (UNIT_METERS[elevation[2]] ?? 1));
@@ -98,184 +98,198 @@ export function parseWorkout(element: string): ParsedWorkout | null {
   const humidity = Number(metadataValue(element, "HKWeatherHumidity")?.split(" ")[0]);
   if (humidity) details.humidity = Math.round(humidity / 100);
   if (a.sourceName) details.device = a.sourceName;
-  details.startTime = a.startDate.slice(11, 16);
-  const startMs = parseHealthDate(a.startDate);
-  const endMs = a.endDate ? parseHealthDate(a.endDate) : startMs + duration * 1000;
-  details.elapsed = Math.round((endMs - startMs) / 1000) || undefined;
   for (const k of Object.keys(details) as (keyof RunDetails)[]) if (details[k] === undefined) delete details[k];
 
+  const startMs = parseHealthDate(a.startDate);
+  const endMs = a.endDate ? parseHealthDate(a.endDate) : startMs + duration * 1000;
   return {
-    externalId: `apple-health:${a.startDate}`,
-    source: "apple-health",
-    // "2024-03-10 08:01:02 +0100" is already in the device's local time.
-    date: a.startDate.slice(0, 10),
-    distance,
-    duration,
-    avgHr,
-    maxHr,
-    indoor: /<MetadataEntry key="HKIndoorWorkout" value="1"/.test(element),
-    details,
+    startDate: a.startDate,
     startMs,
     endMs,
+    distance,
+    duration,
+    avgHr: Number(hr?.average) || undefined,
+    maxHr: Number(hr?.maximum) || undefined,
+    indoor: /<MetadataEntry key="HKIndoorWorkout" value="1"/.test(element),
+    routePath: element.match(/<FileReference path="([^"]+)"/)?.[1],
+    details,
   };
-}
-
-/**
- * Averages heart-rate samples inside [start, end] into SERIES_STEP buckets,
- * using only the source that recorded the run (the one with the most samples
- * in that window), so a phone or second device can't skew it.
- */
-export function bucketHeartRate(times: Float64Array, bpm: Uint8Array, sources: Uint8Array, count: number, startMs: number, endMs: number): number[] | undefined {
-  // Binary search the first sample at or after the start.
-  let lo = 0;
-  let hi = count;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (times[mid] < startMs) lo = mid + 1;
-    else hi = mid;
-  }
-  const buckets = Math.ceil((endMs - startMs) / 1000 / SERIES_STEP);
-  if (buckets <= 0 || buckets > 24 * 120) return undefined;
-  const perSource = new Map<number, number>();
-  for (let i = lo; i < count && times[i] <= endMs; i++) perSource.set(sources[i], (perSource.get(sources[i]) ?? 0) + 1);
-  const source = [...perSource.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  const sum = new Float64Array(buckets);
-  const n = new Uint16Array(buckets);
-  let found = 0;
-  for (let i = lo; i < count && times[i] <= endMs; i++) {
-    if (sources[i] !== source) continue;
-    const b = Math.min(buckets - 1, Math.floor((times[i] - startMs) / 1000 / SERIES_STEP));
-    sum[b] += bpm[i];
-    n[b]++;
-    found++;
-  }
-  if (found < 10) return undefined;
-  return Array.from(sum, (s, i) => (n[i] ? Math.round(s / n[i]) : 0));
 }
 
 type DailyType = "RestingHeartRate" | "HeartRateVariabilitySDNN" | "VO2Max";
-
 const SCAN =
   /<Record type="HKQuantityTypeIdentifier(HeartRate|RestingHeartRate|HeartRateVariabilitySDNN|VO2Max)"([^>]*)>|<Workout /g;
 
-export interface AppleHealthImport {
-  workouts: RawActivity[];
-  metrics: HealthMetrics;
-}
-
 /**
- * Reads the export. Heart-rate samples and daily metrics older than `since`
- * are skipped to keep memory flat on multi-year exports.
+ * Incremental reader for the main XML: feed it text chunks, then call
+ * finish() with the workout-route GPX files. Heart-rate samples and daily
+ * values older than `since` are skipped to keep memory flat.
  */
-export async function parseAppleHealthExport(file: File, onProgress: Progress, since = "0000-00-00"): Promise<AppleHealthImport> {
-  const workouts: ParsedWorkout[] = [];
-  const daily: Record<DailyType, Map<string, number[]>> = {
-    RestingHeartRate: new Map(),
-    HeartRateVariabilitySDNN: new Map(),
-    VO2Max: new Map(),
-  };
-  let times = new Float64Array(1 << 16);
-  let bpm = new Uint8Array(1 << 16);
-  let src = new Uint8Array(1 << 16);
-  const sourceIds = new Map<string, number>();
-  let samples = 0;
-  let buffer = "";
+export class AppleHealthReader {
+  private workouts: AppleWorkout[] = [];
+  private daily: Record<DailyType, Map<string, number[]>> = { RestingHeartRate: new Map(), HeartRateVariabilitySDNN: new Map(), VO2Max: new Map() };
+  private times = new Float64Array(1 << 16);
+  private bpm = new Uint8Array(1 << 16);
+  private src = new Uint8Array(1 << 16);
+  private sourceIds = new Map<string, number>();
+  private samples = 0;
+  private buffer = "";
+  /** route points by file name, stored compactly: [ms, lat, lon, alt] per point */
+  private routes = new Map<string, Float64Array>();
+  /** the stream contained a <HealthData> document at all */
+  sawHealthData = false;
 
-  const addSample = (time: number, value: number, sourceName: string) => {
-    if (samples === times.length) {
-      const t = new Float64Array(times.length * 2);
-      t.set(times);
-      times = t;
-      const b = new Uint8Array(bpm.length * 2);
-      b.set(bpm);
-      bpm = b;
-      const s = new Uint8Array(src.length * 2);
-      s.set(src);
-      src = s;
+  constructor(private since = "0000-00-00") {}
+
+  private addSample(time: number, value: number, sourceName: string) {
+    if (this.samples === this.times.length) {
+      const times = new Float64Array(this.times.length * 2);
+      times.set(this.times);
+      this.times = times;
+      const bpm = new Uint8Array(this.bpm.length * 2);
+      bpm.set(this.bpm);
+      this.bpm = bpm;
+      const src = new Uint8Array(this.src.length * 2);
+      src.set(this.src);
+      this.src = src;
     }
-    if (!sourceIds.has(sourceName)) sourceIds.set(sourceName, sourceIds.size % 256);
-    times[samples] = time;
-    bpm[samples] = Math.min(255, Math.round(value));
-    src[samples] = sourceIds.get(sourceName)!;
-    samples++;
-  };
+    if (!this.sourceIds.has(sourceName)) this.sourceIds.set(sourceName, this.sourceIds.size % 256);
+    this.times[this.samples] = time;
+    this.bpm[this.samples] = Math.min(255, Math.round(value));
+    this.src[this.samples] = this.sourceIds.get(sourceName)!;
+    this.samples++;
+  }
 
-  const drain = () => {
+  push(chunk: string) {
+    this.buffer += chunk;
+    if (!this.sawHealthData && this.buffer.includes("<HealthData")) this.sawHealthData = true;
     let pos = 0;
     let pendingWorkout = false;
     for (;;) {
       SCAN.lastIndex = pos;
-      const m = SCAN.exec(buffer);
+      const m = SCAN.exec(this.buffer);
       if (!m) break;
       if (m[1]) {
         const attrs = attributes(m[2]);
         pos = SCAN.lastIndex;
-        if (!attrs.startDate || attrs.startDate.slice(0, 10) < since) continue;
+        if (!attrs.startDate || attrs.startDate.slice(0, 10) < this.since) continue;
         const value = Number(attrs.value);
         if (!Number.isFinite(value)) continue;
         if (m[1] === "HeartRate") {
-          addSample(parseHealthDate(attrs.startDate), value, attrs.sourceName ?? "");
+          this.addSample(parseHealthDate(attrs.startDate), value, attrs.sourceName ?? "");
         } else {
           const day = attrs.startDate.slice(0, 10);
-          const list = daily[m[1] as DailyType];
+          const list = this.daily[m[1] as DailyType];
           list.set(day, [...(list.get(day) ?? []), value]);
         }
         continue;
       }
       // A <Workout>: wait until the whole element has arrived.
-      const tagEnd = buffer.indexOf(">", m.index);
-      if (tagEnd < 0) {
+      const tagEnd = this.buffer.indexOf(">", m.index);
+      let end = -1;
+      if (tagEnd >= 0) {
+        if (this.buffer[tagEnd - 1] === "/") end = tagEnd + 1;
+        else {
+          const close = this.buffer.indexOf("</Workout>", tagEnd);
+          if (close >= 0) end = close + "</Workout>".length;
+        }
+      }
+      if (end < 0) {
         pos = m.index;
         pendingWorkout = true;
         break;
       }
-      let end: number;
-      if (buffer[tagEnd - 1] === "/") end = tagEnd + 1;
-      else {
-        const close = buffer.indexOf("</Workout>", tagEnd);
-        if (close < 0) {
-          pos = m.index;
-          pendingWorkout = true;
-          break;
-        }
-        end = close + "</Workout>".length;
-      }
-      const workout = parseWorkout(buffer.slice(m.index, end));
-      if (workout) workouts.push(workout);
+      const workout = parseWorkout(this.buffer.slice(m.index, end));
+      if (workout) this.workouts.push(workout);
       pos = end;
     }
     // Keep an unfinished workout whole; otherwise only a possibly incomplete last tag.
-    const rest = buffer.slice(pos);
-    buffer = pendingWorkout ? rest : rest.slice(Math.max(0, rest.lastIndexOf("<")));
-  };
-
-  const found = await streamText(
-    file,
-    (chunk) => {
-      buffer += chunk;
-      drain();
-    },
-    onProgress,
-    (name) => /(^|\/)export\.xml$/i.test(name),
-  );
-  if (!found) throw new Error("no-export-xml");
-
-  // Samples arrive grouped by source, so sort by time before matching them to workouts.
-  const order = Array.from({ length: samples }, (_, i) => i).sort((x, y) => times[x] - times[y]);
-  const sortedTimes = Float64Array.from(order, (i) => times[i]);
-  const sortedBpm = Uint8Array.from(order, (i) => bpm[i]);
-  const sortedSources = Uint8Array.from(order, (i) => src[i]);
-  for (const w of workouts) {
-    if (w.date < since) continue;
-    const series = bucketHeartRate(sortedTimes, sortedBpm, sortedSources, samples, w.startMs, w.endMs);
-    if (series) w.details = { ...w.details, hrSeries: series };
+    const rest = this.buffer.slice(pos);
+    this.buffer = pendingWorkout ? rest : rest.slice(Math.max(0, rest.lastIndexOf("<")));
   }
 
-  const toDaily = (map: Map<string, number[]>): DailyValue[] =>
-    [...map.entries()].map(([d, values]) => [d, Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10] as DailyValue).sort((a, b) => a[0].localeCompare(b[0]));
-  return {
-    // startMs/endMs ride along but are dropped by toRuns, which copies known fields only.
-    workouts,
-    metrics: { restingHr: toDaily(daily.RestingHeartRate), hrv: toDaily(daily.HeartRateVariabilitySDNN), vo2max: toDaily(daily.VO2Max) },
-  };
+  /** Heart-rate samples inside a workout, from the device that recorded the most of them. */
+  private heartRate(times: Float64Array, bpm: Uint8Array, src: Uint8Array, w: AppleWorkout): Sample[] {
+    let lo = 0;
+    let hi = this.samples;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (times[mid] < w.startMs) lo = mid + 1;
+      else hi = mid;
+    }
+    const counts = new Map<number, number>();
+    for (let i = lo; i < this.samples && times[i] <= w.endMs; i++) counts.set(src[i], (counts.get(src[i]) ?? 0) + 1);
+    const source = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    const out: Sample[] = [];
+    for (let i = lo; i < this.samples && times[i] <= w.endMs; i++) {
+      if (src[i] === source) out.push({ t: (times[i] - w.startMs) / 1000, hr: bpm[i] });
+    }
+    return out.length >= 10 ? out : [];
+  }
+
+  /**
+   * A workout-routes/*.gpx file. Routes can arrive before or after the main
+   * XML, so they're kept until finish(), as numbers rather than text, and
+   * only from `since` on: a multi-year export holds thousands of them.
+   */
+  addRoute(path: string, gpx: string) {
+    const points = gpxPoints(gpx);
+    // A day of slack: the route's instant and the workout's local date can straddle midnight.
+    if (!points.length || points[0].ms < Date.parse(this.since) - 86_400_000) return;
+    const packed = new Float64Array(points.length * 4);
+    points.forEach((p, i) => packed.set([p.ms, p.lat ?? NaN, p.lon ?? NaN, p.alt ?? NaN], i * 4));
+    this.routes.set(path.split("/").pop()!, packed);
+  }
+
+  private routeSamples(w: AppleWorkout): Sample[] {
+    const packed = w.routePath ? this.routes.get(w.routePath.split("/").pop()!) : undefined;
+    if (!packed) return [];
+    const out: Sample[] = [];
+    const value = (v: number) => (Number.isNaN(v) ? undefined : v);
+    for (let i = 0; i < packed.length; i += 4) out.push({ t: (packed[i] - w.startMs) / 1000, lat: value(packed[i + 1]), lon: value(packed[i + 2]), alt: value(packed[i + 3]) });
+    return out;
+  }
+
+  /** Builds activities and daily metrics. */
+  finish(): { activities: RawActivity[]; metrics: HealthMetrics } {
+    // Samples arrive grouped by source, so sort by time before matching them to workouts.
+    const order = Array.from({ length: this.samples }, (_, i) => i).sort((x, y) => this.times[x] - this.times[y]);
+    const times = Float64Array.from(order, (i) => this.times[i]);
+    const bpm = Uint8Array.from(order, (i) => this.bpm[i]);
+    const src = Uint8Array.from(order, (i) => this.src[i]);
+
+    const activities: RawActivity[] = [];
+    for (const w of this.workouts) {
+      if (w.startDate.slice(0, 10) < this.since) continue;
+      const activity = toActivity(
+        {
+          source: "apple-health",
+          start: w.startMs,
+          sport: "running",
+          totalDistance: w.distance,
+          totalSeconds: w.duration,
+          avgHr: w.avgHr,
+          maxHr: w.maxHr,
+          totalAscent: w.details.elevationGain,
+          calories: w.details.calories,
+          indoor: w.indoor,
+          device: w.details.device,
+          id: `apple-health:${w.startDate}`,
+          // Apple's own date and time are already in the device's local time zone.
+          local: { date: w.startDate.slice(0, 10), time: w.startDate.slice(11, 16) },
+        },
+        [...this.routeSamples(w), ...this.heartRate(times, bpm, src, w)],
+      );
+      if (!activity) continue;
+      const elapsed = Math.round((w.endMs - w.startMs) / 1000);
+      activities.push({ ...activity, details: { ...activity.details, ...w.details, ...(elapsed > 0 ? { elapsed } : {}) } });
+    }
+
+    const toDaily = (map: Map<string, number[]>): DailyValue[] =>
+      [...map.entries()].map(([d, values]) => [d, Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10] as DailyValue).sort((a, b) => a[0].localeCompare(b[0]));
+    return {
+      activities,
+      metrics: { restingHr: toDaily(this.daily.RestingHeartRate), hrv: toDaily(this.daily.HeartRateVariabilitySDNN), vo2max: toDaily(this.daily.VO2Max) },
+    };
+  }
 }

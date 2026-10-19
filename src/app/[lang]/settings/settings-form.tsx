@@ -10,6 +10,7 @@ import { deriveFitness, type DerivedFitness } from "@/lib/fitness";
 import { exportData, importData, resetData, saveProfile, useAppData } from "@/lib/store";
 import type { Experience, Profile, Run, RunSource, Units } from "@/lib/types";
 import { HALF, MARATHON, predictTime, vdotFromRace } from "@/lib/vdot";
+import { DateField } from "@/components/date-field";
 import { Card, Skeleton, Stat } from "@/components/ui";
 
 export const RACE_DISTANCES: { label: MessageKey; meters: number }[] = [
@@ -32,7 +33,8 @@ interface FormState {
   longRunDay: string;
   experience: Experience;
   units: Units;
-  restart: boolean;
+  /** ISO date the training plan starts */
+  planStart: string;
 }
 
 function defaults(): FormState {
@@ -52,7 +54,7 @@ function defaults(): FormState {
     longRunDay: "6",
     experience: "first",
     units: "km",
-    restart: false,
+    planStart: freshStart(today),
   };
 }
 
@@ -71,7 +73,7 @@ function fromProfile(p: Profile): FormState {
     longRunDay: String(p.longRunDay),
     experience: p.experience,
     units: p.units,
-    restart: false,
+    planStart: p.planStart,
   };
 }
 
@@ -98,7 +100,8 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
   const goalSeconds = form.goalTime.trim() ? parseClock(form.goalTime) : null;
   const vdot = raceSeconds ? vdotFromRace(Number(form.raceDistance), raceSeconds) : null;
   const weeksToRace = Math.floor(daysBetween(todayISO(), form.raceDate) / 7);
-  const fitness = deriveFitness(runs, profile && !form.restart ? profile.planStart : freshStart(todayISO()), todayISO());
+  const trainingWeeks = form.planStart && form.raceDate ? Math.floor(daysBetween(mondayOf(form.planStart), mondayOf(form.raceDate)) / 7) + 1 : 0;
+  const fitness = deriveFitness(runs, form.planStart || freshStart(todayISO()), todayISO());
   const fitnessFromRuns = fitness.vdot !== null;
   const volumeFromRuns = fitness.weeklyVolume !== null;
 
@@ -108,8 +111,9 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
     const u = unitLength(form.units);
     if (!fitnessFromRuns && (!raceSeconds || !vdot || vdot < 15 || vdot > 90)) return setError(t("settings.error.raceTime"));
     if (form.goalTime.trim() && !goalSeconds) return setError(t("settings.error.goalTime"));
-    if (daysBetween(today, form.raceDate) < 28) return setError(t("settings.error.tooSoon"));
-    const planStart = profile && !form.restart && profile.planStart <= form.raceDate ? profile.planStart : freshStart(today);
+    if (form.raceDate < today) return setError(t("settings.error.racePassed"));
+    if (!form.planStart || daysBetween(form.planStart, form.raceDate) < 28) return setError(t("settings.error.tooSoon"));
+    const planStart = form.planStart;
     saveProfile({
       name: form.name.trim(),
       raceName: form.raceName.trim(),
@@ -141,18 +145,37 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
             <Field label={t("settings.raceName")}>
               <input className="field" placeholder={t("settings.raceNamePlaceholder")} value={form.raceName} onChange={(e) => set("raceName", e.target.value)} />
             </Field>
-            <Field label={t("settings.raceDate")} hint={weeksToRace > 0 ? tn("settings.weeksAway", weeksToRace) : undefined}>
-              <input
-                type="date"
-                className="field"
-                required
+            <div>
+              <label htmlFor="race-date" className="mb-1.5 block text-sm font-medium">
+                {t("settings.raceDate")}
+              </label>
+              <DateField
+                id="race-date"
                 value={form.raceDate}
-                onChange={(e) => {
-                  set("raceDate", e.target.value);
-                  if (!profile && e.target.value) set("longRunDay", String(weekday(e.target.value)));
+                min={todayISO()}
+                onChange={(iso) => {
+                  set("raceDate", iso);
+                  if (!profile) set("longRunDay", String(weekday(iso)));
                 }}
               />
-            </Field>
+              {weeksToRace > 0 && <span className="mt-1 block text-xs text-muted">{tn("settings.weeksAway", weeksToRace)}</span>}
+            </div>
+            <div>
+              <label htmlFor="plan-start" className="mb-1.5 block text-sm font-medium">
+                {t("settings.planStart")}
+              </label>
+              <DateField id="plan-start" value={form.planStart} max={form.raceDate ? addDays(form.raceDate, -28) : undefined} onChange={(iso) => set("planStart", iso)} />
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <button type="button" className="font-medium text-accent hover:underline" onClick={() => set("planStart", todayISO())}>
+                  {t("settings.startToday")}
+                </button>
+                <button type="button" className="font-medium text-accent hover:underline" onClick={() => set("planStart", addDays(mondayOf(todayISO()), 7))}>
+                  {t("settings.startMonday")}
+                </button>
+                {trainingWeeks > 0 && <span className="text-muted">{tn("settings.trainingWeeks", trainingWeeks)}</span>}
+              </div>
+              {form.planStart && form.planStart < todayISO() && <p className="mt-1 text-xs text-muted">{t("settings.startPast")}</p>}
+            </div>
             <Field label={t("settings.goal")} hint={t("settings.goalHint")}>
               <input className="field tabular" placeholder="3:59:00" value={form.goalTime} onChange={(e) => set("goalTime", e.target.value)} />
             </Field>
@@ -252,12 +275,6 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
               </select>
             </Field>
           </div>
-          {profile && (
-            <label className="mt-4 flex items-center gap-2 text-sm text-ink-2">
-              <input type="checkbox" checked={form.restart} onChange={(e) => set("restart", e.target.checked)} className="accent-[var(--accent)]" />
-              {t("settings.restart")}
-            </label>
-          )}
         </Card>
 
         {error && <p className="text-sm font-medium text-warn">{error}</p>}
@@ -283,7 +300,7 @@ function DataCard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `marathon-coach-${todayISO()}.json`;
+    a.download = `m42-backup-${todayISO()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -326,7 +343,10 @@ function DataCard() {
 function RecordedFitness({ fitness, runs, units }: { fitness: DerivedFitness; runs: Run[]; units: Units }) {
   const { t, locale } = useI18n();
   const sources = runs.map((r) => r.source).filter((s): s is RunSource => !!s && s !== "manual");
-  const source: RunSource = sources.includes("apple-health") ? "apple-health" : "strava";
+  // Name the source most runs came from.
+  const counts = new Map<RunSource, number>();
+  for (const s of sources) counts.set(s, (counts.get(s) ?? 0) + 1);
+  const source = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "file";
   const best = fitness.bestRun!;
   const bestParams = { dist: formatDistance(best.distance, units, 1, locale), time: formatClock(best.duration), date: { date: best.date } };
   const explanation =

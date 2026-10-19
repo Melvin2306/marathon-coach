@@ -11,6 +11,7 @@ import { generatePlan } from "./plan";
 import type { DailyValue, HealthMetrics, Plan, Profile, Run, RunDetails, StravaAthlete } from "./types";
 import { HALF, predictTime } from "./vdot";
 
+// Kept from the app's original name so existing data survives the rebrand.
 const KEY = "marathon-coach:v1";
 
 export interface AppData {
@@ -167,7 +168,12 @@ export function saveHealthMetrics(incoming: HealthMetrics) {
     [...new Map([...a, ...b].map(([d, v]) => [d, v] as DailyValue)).entries()].sort((x, y) => x[0].localeCompare(y[0]));
   write({
     ...data,
-    health: { restingHr: merge(current.restingHr, incoming.restingHr), hrv: merge(current.hrv, incoming.hrv), vo2max: merge(current.vo2max, incoming.vo2max) },
+    health: {
+      restingHr: merge(current.restingHr, incoming.restingHr),
+      hrv: merge(current.hrv, incoming.hrv),
+      hrvRmssd: merge(current.hrvRmssd ?? [], incoming.hrvRmssd ?? []),
+      vo2max: merge(current.vo2max, incoming.vo2max),
+    },
   });
 }
 
@@ -193,7 +199,7 @@ export function exportData(): string {
 
 export function importData(json: string) {
   const parsed = JSON.parse(json) as AppData;
-  if (!Array.isArray(parsed.runs)) throw new Error("Not a Marathon Coach backup");
+  if (!Array.isArray(parsed.runs)) throw new Error("Not an M42 backup");
   write({ profile: parsed.profile ?? null, runs: parsed.runs, health: parsed.health, strava: parsed.strava, prefs: parsed.prefs });
 }
 

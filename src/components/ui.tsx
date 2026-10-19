@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useI18n } from "@/i18n/client";
+import { LogoMark } from "./logo";
 import type { Phase, Workout, WorkoutType } from "@/lib/types";
 
 export function Card({ title, action, children, className = "" }: { title?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -97,7 +98,7 @@ export function NeedsSetup() {
   const { t, href } = useI18n();
   return (
     <div className="mx-auto max-w-xl py-16 text-center">
-      <div className="mx-auto mb-6 grid size-16 place-items-center rounded-full bg-accent text-xl font-bold text-accent-ink">42</div>
+      <LogoMark size={64} className="mx-auto mb-6" />
       <h1 className="text-3xl font-semibold tracking-tight">{t("setup.title")}</h1>
       <p className="mt-3 text-ink-2">{t("setup.body")}</p>
       <Link href={href("/settings")} className="btn-primary mt-8">

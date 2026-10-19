@@ -18,7 +18,7 @@ export function vdotFromRace(distance: number, seconds: number): number {
 }
 
 /** Velocity (m/min) that costs the given VO2. */
-function velocityForVo2(vo2: number): number {
+export function velocityForVo2(vo2: number): number {
   const a = 0.000104;
   const b = 0.182258;
   const c = -4.6 - vo2;
@@ -91,9 +91,18 @@ export function maxVdotGain(vdot: number): number {
  * measured VO2max, not to VDOT, and would overstate fitness by ~15–20% at
  * easy effort.) Returns null outside the zones the anchors cover.
  */
+/** Share of VDOT that a heart rate corresponds to (inverse of Daniels' anchors fit). */
+export function intensityAtHeartRate(hr: number, maxHr: number): number {
+  return ((hr / maxHr) * 100 - 14.04) / 0.8773 / 100;
+}
+
 export function vdotFromHeartRate(distance: number, seconds: number, avgHr: number, maxHr: number): number | null {
-  const percentHrMax = (avgHr / maxHr) * 100;
-  const fraction = (percentHrMax - 14.04) / 0.8773 / 100;
+  const fraction = intensityAtHeartRate(avgHr, maxHr);
   if (fraction < 0.59 || fraction > 1) return null;
   return oxygenCost(distance / (seconds / 60)) / fraction;
+}
+
+/** Pace (s/km) a runner of this VDOT holds at a given heart rate. */
+export function paceAtHeartRate(vdot: number, hr: number, maxHr: number): number {
+  return 60_000 / velocityForVo2(vdot * intensityAtHeartRate(hr, maxHr));
 }
