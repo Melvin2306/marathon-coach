@@ -9,9 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "next": "16.4.2",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

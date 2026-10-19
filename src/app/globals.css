@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  color-scheme: light;
+  --bg: #f6f5f2;
+  --surface: #fcfcfb;
+  --surface-2: #f0efeb;
+  --border: #e3e1db;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --muted: #8a8882;
+  --accent: #eb6834;
+  --accent-ink: #ffffff;
+  --series-1: #2a78d6;
+  --series-target: #d6d4cd;
+  --easy: #1baf7a;
+  --quality: #eb6834;
+  --long: #2a78d6;
+  --race: #e34948;
+  --rest: #b9b7b0;
+  --good: #1a8a52;
+  --warn: #b36b00;
+  /* heart-rate zones: ordinal blue ramp, validated light→dark */
+  --z1: #86b6ef;
+  --z2: #5598e7;
+  --z3: #2a78d6;
+  --z4: #1c5cab;
+  --z5: #104281;
+  --hr: #e34948;
+  --pace: #2a78d6;
+  --altitude: #b9b7b0;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --border: #2f2f2c;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --muted: #8f8e86;
+    --accent: #d95926;
+    --accent-ink: #ffffff;
+    --series-1: #3987e5;
+    --series-target: #3a3a37;
+    --easy: #199e70;
+    --quality: #d95926;
+    --long: #3987e5;
+    --race: #e66767;
+    --rest: #55544f;
+    --good: #3fbf7f;
+    --warn: #e0a030;
+    --z1: #184f95;
+    --z2: #256abf;
+    --z3: #3987e5;
+    --z4: #6da7ec;
+    --z5: #9ec5f4;
+    --hr: #e66767;
+    --pace: #3987e5;
+    --altitude: #55544f;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-ink-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility field {
+  @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply btn bg-accent text-accent-ink hover:brightness-110;
+}
+
+@utility btn-ghost {
+  @apply btn border border-line bg-surface text-ink hover:bg-surface-2;
 }
