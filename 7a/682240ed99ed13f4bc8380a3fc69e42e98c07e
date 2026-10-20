@@ -1,0 +1,39 @@
+README.md
+  s_87019c02500d1c::t_b2abef3e964909 3,5-31,35-173,178-180,183-188,191-201,205,208,210,213-225,227-229,236,238,241,244,246-251,253,255,257,259-284,286,288-291,293-307
+src/app/[lang]/settings/settings-form.tsx
+  s_87019c02500d1c::t_9e19190356149f 169,172,282
+src/app/[lang]/import/import-view.tsx
+  s_87019c02500d1c::t_79fde6ca543af5 268
+src/app/[lang]/plan/plan-view.tsx
+  s_87019c02500d1c::t_9e19190356149f 60-61,86-108
+src/components/workout-guide.tsx
+  s_87019c02500d1c::t_9e19190356149f 53
+src/components/treadmill-program.tsx
+  s_87019c02500d1c::t_9e19190356149f 27
+src/i18n/messages/en.ts
+  s_87019c02500d1c::t_9e19190356149f 204
+src/i18n/messages/de.ts
+  s_87019c02500d1c::t_9e19190356149f 205
+src/components/charts.tsx
+  s_87019c02500d1c::t_9e19190356149f 112-113
+src/app/[lang]/log/log-view.tsx
+  s_87019c02500d1c::t_9e19190356149f 96,147,193
+src/components/pace-guide.tsx
+  s_87019c02500d1c::t_9e19190356149f 100-101,113,122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7a682240ed99ed13f4bc8380a3fc69e42e98c07e",
+  "prompts": {},
+  "sessions": {
+    "s_87019c02500d1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c6acc68d-4b5d-4d23-ad5f-f2394ba2f133",
+        "model": "unknown"
+      },
+      "human_author": "Melvin Rinkleff <melvin.rinkleff@gmx.de>"
+    }
+  }
+}
