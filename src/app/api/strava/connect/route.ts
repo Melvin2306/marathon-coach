@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { DEFAULT_LOCALE, hasLocale } from "@/i18n/config";
-import { STATE_COOKIE, callbackUrl, stravaConfig } from "@/lib/strava/server";
+import { STATE_COOKIE, callbackUrl, stravaConfig, stravaDisabled } from "@/lib/strava/server";
 
 export function GET(request: NextRequest) {
+  const disabled = stravaDisabled();
+  if (disabled) return disabled;
   const lang = request.nextUrl.searchParams.get("lang") ?? undefined;
   const locale = hasLocale(lang) ? lang : DEFAULT_LOCALE;
   const config = stravaConfig();

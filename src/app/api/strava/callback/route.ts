@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { DEFAULT_LOCALE, hasLocale } from "@/i18n/config";
-import { STATE_COOKIE, exchangeCode, writeSession } from "@/lib/strava/server";
+import { STATE_COOKIE, exchangeCode, writeSession, stravaDisabled } from "@/lib/strava/server";
 
 export async function GET(request: NextRequest) {
+  const disabled = stravaDisabled();
+  if (disabled) return disabled;
   const params = request.nextUrl.searchParams;
   const [expected, savedLocale] = (request.cookies.get(STATE_COOKIE)?.value ?? "").split(":");
   const locale = hasLocale(savedLocale) ? savedLocale : DEFAULT_LOCALE;

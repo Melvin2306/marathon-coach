@@ -272,6 +272,11 @@ export async function deauthorize(accessToken: string) {
  * responses: 401 not-connected (the cookie is cleared), 403 missing-scope,
  * 502 when Strava is unavailable. A refreshed token is written back.
  */
+/** While STRAVA_SYNC is off, every Strava route answers 404, so none of them is reachable. */
+export function stravaDisabled(): NextResponse | null {
+  return STRAVA_SYNC ? null : NextResponse.json({ error: "disabled" }, { status: 404 });
+}
+
 export async function withStrava(request: NextRequest, handler: (session: StravaSession) => Promise<unknown>): Promise<NextResponse> {
   if (!STRAVA_SYNC) return NextResponse.json({ error: "disabled" }, { status: 404 });
   const stored = readSession(request);
