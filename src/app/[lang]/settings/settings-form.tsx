@@ -7,7 +7,7 @@ import type { MessageKey } from "@/i18n/translate";
 import { addDays, daysBetween, mondayOf, todayISO, weekday, weekdayName } from "@/lib/dates";
 import { formatClock, formatDistance, parseClock, parseDecimal, unitLength } from "@/lib/format";
 import { deriveFitness, type DerivedFitness } from "@/lib/fitness";
-import { exportData, importData, resetData, saveProfile, useAppData } from "@/lib/store";
+import { exportData, importData, loadDemo, readData, resetData, saveProfile, useAppData } from "@/lib/store";
 import type { Experience, Profile, Run, RunSource, Units } from "@/lib/types";
 import { HALF, MARATHON, predictTime, vdotFromRace } from "@/lib/vdot";
 import { DateField } from "@/components/date-field";
@@ -321,15 +321,45 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
         </div>
       </form>
 
-      {profile && <DataCard />}
+      {/* Also offered before the first plan, to restore a backup on a new device. */}
+      <DataCard hasData={profile !== null} />
     </div>
   );
 }
 
-function DataCard() {
-  const { t } = useI18n();
+/** Taps on "Import backup" that switch on the demo, and how long to wait for the next one. */
+const DEMO_TAPS = 5;
+const TAP_WINDOW_MS = 350;
+
+function DataCard({ hasData }: { hasData: boolean }) {
+  const { t, href } = useI18n();
+  const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const taps = useRef<{ count: number; timer?: number }>({ count: 0 });
+
+  // Hidden demo: five quick taps on "Import backup" load Max Mustermann's data.
+  // The file picker opens once the taps stop; browsers keep the tap's user
+  // activation that long (WebKit forwards it through timers of up to 1 s).
+  function onImportTap() {
+    const tap = taps.current;
+    window.clearTimeout(tap.timer);
+    if (++tap.count >= DEMO_TAPS) {
+      tap.count = 0;
+      return startDemo();
+    }
+    tap.timer = window.setTimeout(() => {
+      tap.count = 0;
+      fileRef.current?.click();
+    }, TAP_WINDOW_MS);
+  }
+
+  async function startDemo() {
+    const current = readData();
+    if (!current.demo && (current.profile || current.runs.length) && !confirm(t("demo.confirm"))) return;
+    await loadDemo();
+    router.push(href("/"));
+  }
 
   function download() {
     const blob = new Blob([exportData()], { type: "application/json" });
@@ -354,21 +384,25 @@ function DataCard() {
     <Card title={t("data.title")}>
       <p className="mb-4 text-sm text-ink-2">{t("data.body")}</p>
       <div className="flex flex-wrap gap-3">
-        <button className="btn-ghost" onClick={download}>
-          {t("data.export")}
-        </button>
-        <button className="btn-ghost" onClick={() => fileRef.current?.click()}>
+        {hasData && (
+          <button className="btn-ghost" onClick={download}>
+            {t("data.export")}
+          </button>
+        )}
+        <button className="btn-ghost" onClick={onImportTap}>
           {t("data.import")}
         </button>
         <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
-        <button
-          className="btn-ghost text-warn"
-          onClick={() => {
-            if (confirm(t("data.resetConfirm"))) resetData();
-          }}
-        >
-          {t("data.reset")}
-        </button>
+        {hasData && (
+          <button
+            className="btn-ghost text-warn"
+            onClick={() => {
+              if (confirm(t("data.resetConfirm"))) resetData();
+            }}
+          >
+            {t("data.reset")}
+          </button>
+        )}
       </div>
       {message && <p className="mt-3 text-sm text-ink-2">{message}</p>}
     </Card>

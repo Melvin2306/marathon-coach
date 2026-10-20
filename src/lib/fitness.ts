@@ -1,8 +1,8 @@
 // Current fitness from recorded runs (Apple Health, Strava). When there are
 // enough of them, they replace the numbers typed into Settings.
 import { addDays, daysBetween } from "./dates";
-import type { Run } from "./types";
-import { vdotFromHeartRate, vdotFromRace } from "./vdot";
+import type { Profile, Run } from "./types";
+import { HALF, predictTime, vdotFromHeartRate, vdotFromRace } from "./vdot";
 
 /** Runs from the last 8 weeks describe current fitness. */
 const FITNESS_WINDOW_DAYS = 56;
@@ -87,4 +87,18 @@ export function deriveFitness(runs: Run[], planStart: string, today: string): De
     result.method = "best-effort";
   }
   return result;
+}
+
+/**
+ * The profile with current fitness taken from recorded runs where available:
+ * fitness becomes a half-marathon equivalent of the derived VDOT, and weekly
+ * volume / longest run come from the weeks before the plan started.
+ */
+export function effectiveProfile(profile: Profile, fitness: DerivedFitness): Profile {
+  return {
+    ...profile,
+    recentRace: fitness.vdot ? { distance: HALF, time: predictTime(fitness.vdot, HALF) } : profile.recentRace,
+    weeklyVolume: fitness.weeklyVolume ?? profile.weeklyVolume,
+    longestRun: fitness.longestRun ?? profile.longestRun,
+  };
 }

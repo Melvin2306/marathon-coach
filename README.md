@@ -69,6 +69,16 @@ The name is the distance (42.195 km). The logo is an "M" drawn as a course profi
 4. Choose **Generate my plan**. Your plan, paces and coaching are ready instantly.
 5. Log runs as you go, or import again later from **More → Import**. The same run is never counted twice.
 
+### Demo mode
+
+Want to look around without your own data? Go to **Settings** and tap **Import backup** five times quickly.
+
+This loads **Max Mustermann**, who is training for a sub-4-hour Berlin Marathon:
+- a year of runs and daily resting heart rate, HRV and VO₂max, simulated as if imported from Apple Health
+- realistically about 4:07 today, and on track for sub-4 by race day if he follows the plan
+
+A banner shows on every page while the demo is loaded; **Exit demo** clears it. If you already have data, M42 asks before replacing it, so export a backup first. The demo is generated on your device from a fixed seed (`src/lib/demo.ts`), so it looks the same every time.
+
 ### Install it as an app
 
 | Device | How |
@@ -266,6 +276,7 @@ src/
     heart.ts, progress.ts  heart-rate zones and Progress series
     treadmill.ts         treadmill speeds and inclines
     store.ts             localStorage-backed store (useSyncExternalStore)
+    demo.ts              the demo athlete: a year of simulated Apple Health data
     site.ts              site settings: URL, operator, STRAVA_SYNC
     import/
       importer.ts        recognises each export by its paths and runs the right parser

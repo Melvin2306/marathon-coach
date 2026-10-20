@@ -379,6 +379,10 @@ export const en = {
   "data.resetConfirm": "Delete your profile and all logged runs? This can't be undone.",
   "data.restored": "Backup restored.",
   "data.invalid": "That file isn't an M42 backup.",
+  "demo.title": "Demo",
+  "demo.body": "You're looking at Max Mustermann, training for a sub-4-hour Berlin Marathon. His runs and health data are simulated as if imported from Apple Health.",
+  "demo.exit": "Exit demo",
+  "demo.confirm": "Load the demo? It replaces the data on this device with Max Mustermann's. Export a backup first if you want to keep yours.",
 
   "nav.progress": "Progress",
   "import.strava.auto": "Syncs automatically when you open the app.",

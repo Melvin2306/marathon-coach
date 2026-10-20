@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { DemoBanner } from "@/components/demo-banner";
 import { InstallHint } from "@/components/install-hint";
 import { Nav } from "@/components/nav";
 import { ServiceWorker } from "@/components/service-worker";
@@ -86,7 +87,10 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
         <I18nProvider locale={locale}>
           <Nav />
           {STRAVA_SYNC && <StravaAutoSync />}
-          <main className="mx-auto w-full max-w-5xl flex-1 py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-10">{children}</main>
+          <main className="mx-auto w-full max-w-5xl flex-1 py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:py-10">
+            <DemoBanner />
+            {children}
+          </main>
           <InstallHint />
           <ServiceWorker />
           <footer className="mx-auto w-full max-w-5xl px-4 pb-8 text-xs text-muted">

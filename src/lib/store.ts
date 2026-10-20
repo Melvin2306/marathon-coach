@@ -6,10 +6,9 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { SOURCE_PRIORITY, findSameRun, mergeRuns, type ImportedRun, type ImportSummary } from "./import/common";
 import { todayISO } from "./dates";
-import { deriveFitness, type DerivedFitness } from "./fitness";
+import { deriveFitness, effectiveProfile, type DerivedFitness } from "./fitness";
 import { generatePlan } from "./plan";
 import type { DailyValue, HealthMetrics, Plan, Profile, Run, RunDetails, StravaAthlete } from "./types";
-import { HALF, predictTime } from "./vdot";
 
 // Kept from the app's original name so existing data survives the rebrand.
 const KEY = "marathon-coach:v1";
@@ -23,6 +22,8 @@ export interface AppData {
     lastSync?: string;
     athlete?: StravaAthlete;
   };
+  /** the data is Max Mustermann's demo, not the user's own */
+  demo?: boolean;
   prefs?: {
     /** show workouts as treadmill programs */
     treadmill?: boolean;
@@ -77,20 +78,6 @@ export function readData(): AppData {
 
 export function useAppData(): AppData | undefined {
   return useSyncExternalStore(subscribe, read, () => undefined);
-}
-
-/**
- * The profile with current fitness taken from recorded runs where available:
- * fitness becomes a half-marathon equivalent of the derived VDOT, and weekly
- * volume / longest run come from the weeks before the plan started.
- */
-export function effectiveProfile(profile: Profile, fitness: DerivedFitness): Profile {
-  return {
-    ...profile,
-    recentRace: fitness.vdot ? { distance: HALF, time: predictTime(fitness.vdot, HALF) } : profile.recentRace,
-    weeklyVolume: fitness.weeklyVolume ?? profile.weeklyVolume,
-    longestRun: fitness.longestRun ?? profile.longestRun,
-  };
 }
 
 export interface Coaching {
@@ -200,7 +187,13 @@ export function exportData(): string {
 export function importData(json: string) {
   const parsed = JSON.parse(json) as AppData;
   if (!Array.isArray(parsed.runs)) throw new Error("Not an M42 backup");
-  write({ profile: parsed.profile ?? null, runs: parsed.runs, health: parsed.health, strava: parsed.strava, prefs: parsed.prefs });
+  write({ profile: parsed.profile ?? null, runs: parsed.runs, health: parsed.health, strava: parsed.strava, prefs: parsed.prefs, demo: parsed.demo });
+}
+
+/** Replaces all data with the demo athlete's (loaded on demand). Leave with resetData(). */
+export async function loadDemo() {
+  const { demoData } = await import("./demo");
+  write(demoData(todayISO()));
 }
 
 export function resetData() {

@@ -380,6 +380,10 @@ export const de: Record<keyof typeof en, string> = {
   "data.resetConfirm": "Profil und alle eingetragenen Läufe löschen? Das kann nicht rückgängig gemacht werden.",
   "data.restored": "Backup wiederhergestellt.",
   "data.invalid": "Diese Datei ist kein M42-Backup.",
+  "demo.title": "Demo",
+  "demo.body": "Du siehst Max Mustermann, der für einen Berlin-Marathon unter 4 Stunden trainiert. Seine Läufe und Gesundheitsdaten sind simuliert, als kämen sie aus Apple Health.",
+  "demo.exit": "Demo beenden",
+  "demo.confirm": "Demo laden? Sie ersetzt die Daten auf diesem Gerät durch die von Max Mustermann. Exportiere vorher ein Backup, wenn du deine behalten willst.",
 
   "nav.progress": "Fortschritt",
   "import.strava.auto": "Synchronisiert automatisch, wenn du die App öffnest.",
