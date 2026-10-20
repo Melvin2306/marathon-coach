@@ -50,7 +50,7 @@ export function WorkoutWhy({ type, vdot, units, maxHr }: { type: WorkoutType; vd
   return (
     // A named group: this sits inside the week's own <details className="group">.
     <details className="group/why mt-1.5">
-      <summary className="cursor-pointer list-none text-xs font-medium text-accent">
+      <summary className="cursor-pointer list-none py-2 text-xs font-medium text-accent md:py-0">
         <span className="group-open/why:hidden">{t("guide.why")}</span>
         <span className="hidden group-open/why:inline">{t("guide.hide")}</span>
       </summary>

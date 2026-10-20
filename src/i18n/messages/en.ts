@@ -201,6 +201,7 @@ export const en = {
   "log.history.one": "History · {n} run",
   "log.empty": "No runs yet. Your first one is the hardest to log.",
   "log.delete": "Delete",
+  "log.deleteConfirm": "Delete this run?",
   "log.form.title": "Log a run",
   "log.form.date": "Date",
   "log.form.type": "Type",

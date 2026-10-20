@@ -57,8 +57,8 @@ export function PlanView() {
       <details className="group rounded-2xl border border-line bg-surface">
         <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4">
           <span>
-            <span className="font-semibold">{t("guide.typesTitle")}</span>
-            <span className="ml-2 text-sm text-ink-2">{t("guide.typesSubtitle")}</span>
+            <span className="block font-semibold sm:inline">{t("guide.typesTitle")}</span>
+            <span className="block text-sm text-ink-2 sm:ml-2 sm:inline">{t("guide.typesSubtitle")}</span>
           </span>
           <span className="text-muted transition group-open:rotate-90">›</span>
         </summary>
@@ -83,22 +83,29 @@ export function PlanView() {
                 open={w.index === current}
                 className={`group scroll-mt-20 rounded-2xl border bg-surface ${w.index === current ? "border-accent/50" : "border-line"} ${w.index < current ? "opacity-75" : ""}`}
               >
-                <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-                  <span className="tabular w-20 text-sm font-semibold">{t("plan.week", { n: w.index + 1 })}</span>
-                  <span className="w-16 text-sm text-ink-2">{formatDate(w.start, undefined, locale)}</span>
-                  <span className="flex gap-1" aria-hidden>
-                    {w.workouts.map((x) => (
-                      <TypeDot key={x.date} type={x.type} />
-                    ))}
-                  </span>
-                  <span className="flex-1 text-xs text-muted">
-                    {w.index === current && <span className="mr-2 font-medium text-accent">{t("plan.thisWeek")}</span>}
-                    {w.cutback && t("plan.cutback")}
-                    {w.workouts.some((x) => x.type === "tuneup") && t("plan.tuneup")}
-                  </span>
-                  <span className="tabular text-sm text-ink-2">
-                    {w.index <= current && actual[w.index] > 0 && <span className="text-ink">{formatDistance(actual[w.index], units, 0, locale)} / </span>}
-                    {formatDistance(w.volume, units, 0, locale)}
+                {/* Two lines on phones (week and date, then dots, labels and volume); one row from md up. */}
+                <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
+                  <span className="flex min-w-0 flex-1 flex-col gap-1.5 md:flex-row md:items-center md:gap-4">
+                    <span className="flex items-baseline gap-3 md:contents">
+                      <span className="tabular text-sm font-semibold md:w-20">{t("plan.week", { n: w.index + 1 })}</span>
+                      <span className="text-sm text-ink-2 md:w-16">{formatDate(w.start, undefined, locale)}</span>
+                    </span>
+                    <span className="flex items-center gap-3 md:contents">
+                      <span className="flex gap-1" aria-hidden>
+                        {w.workouts.map((x) => (
+                          <TypeDot key={x.date} type={x.type} />
+                        ))}
+                      </span>
+                      <span className="min-w-0 flex-1 text-xs text-muted">
+                        {w.index === current && <span className="mr-2 font-medium text-accent">{t("plan.thisWeek")}</span>}
+                        {w.cutback && t("plan.cutback")}
+                        {w.workouts.some((x) => x.type === "tuneup") && t("plan.tuneup")}
+                      </span>
+                      <span className="tabular text-sm whitespace-nowrap text-ink-2">
+                        {w.index <= current && actual[w.index] > 0 && <span className="text-ink">{formatDistance(actual[w.index], units, 0, locale)} / </span>}
+                        {formatDistance(w.volume, units, 0, locale)}
+                      </span>
+                    </span>
                   </span>
                   <span className="text-muted transition group-open:rotate-90">›</span>
                 </summary>

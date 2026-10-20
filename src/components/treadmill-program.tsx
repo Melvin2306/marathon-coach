@@ -24,7 +24,7 @@ export function ModeSwitch() {
           type="button"
           aria-pressed={treadmill === value}
           onClick={() => setTreadmillMode(value)}
-          className={`rounded-md px-2 py-0.5 font-medium transition ${treadmill === value ? "bg-surface-2 text-ink" : "text-muted hover:text-ink"}`}
+          className={`rounded-md px-3 py-1.5 font-medium transition md:px-2 md:py-0.5 ${treadmill === value ? "bg-surface-2 text-ink" : "text-muted hover:text-ink"}`}
         >
           {t(value ? "tm.treadmill" : "tm.outdoor")}
         </button>

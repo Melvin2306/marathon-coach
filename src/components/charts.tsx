@@ -109,7 +109,8 @@ export function LineChart({
           </g>
         ))}
         {xTicks.map((x) => (
-          <text key={x} x={sx(x)} y={height - 6} textAnchor="middle" fontSize="10" fill="var(--muted)">
+          // Edge labels are anchored inward so they aren't clipped.
+          <text key={x} x={sx(x)} y={height - 6} textAnchor={sx(x) > W - PAD.right - 24 ? "end" : sx(x) < left + 24 ? "start" : "middle"} fontSize="10" fill="var(--muted)">
             {formatX(x)}
           </text>
         ))}

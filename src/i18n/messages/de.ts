@@ -202,6 +202,7 @@ export const de: Record<keyof typeof en, string> = {
   "log.history.one": "Verlauf · {n} Lauf",
   "log.empty": "Noch keine Läufe. Der erste Eintrag ist der schwerste.",
   "log.delete": "Löschen",
+  "log.deleteConfirm": "Diesen Lauf löschen?",
   "log.form.title": "Lauf eintragen",
   "log.form.date": "Datum",
   "log.form.type": "Art",

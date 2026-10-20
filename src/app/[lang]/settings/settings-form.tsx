@@ -166,10 +166,10 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
               </label>
               <DateField id="plan-start" value={form.planStart} max={form.raceDate ? addDays(form.raceDate, -28) : undefined} onChange={(iso) => set("planStart", iso)} />
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                <button type="button" className="font-medium text-accent hover:underline" onClick={() => set("planStart", todayISO())}>
+                <button type="button" className="py-2 font-medium text-accent hover:underline md:py-0" onClick={() => set("planStart", todayISO())}>
                   {t("settings.startToday")}
                 </button>
-                <button type="button" className="font-medium text-accent hover:underline" onClick={() => set("planStart", addDays(mondayOf(todayISO()), 7))}>
+                <button type="button" className="py-2 font-medium text-accent hover:underline md:py-0" onClick={() => set("planStart", addDays(mondayOf(todayISO()), 7))}>
                   {t("settings.startMonday")}
                 </button>
                 {trainingWeeks > 0 && <span className="text-muted">{tn("settings.trainingWeeks", trainingWeeks)}</span>}
@@ -279,7 +279,7 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
 
         {error && <p className="text-sm font-medium text-warn">{error}</p>}
         <div className="flex gap-3">
-          <button type="submit" className="btn-primary">
+          <button type="submit" className="btn-primary w-full sm:w-auto">
             {profile ? t("settings.save") : t("settings.generate")}
           </button>
         </div>

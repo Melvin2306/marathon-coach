@@ -265,7 +265,7 @@ function GuideItem({ guide }: { guide: Guide }) {
         </ol>
         {guide.tip && <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink-2">{guide.tip}</p>}
         {guide.link && (
-          <a href={guide.link.href} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm font-medium text-accent hover:underline">
+          <a href={guide.link.href} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block py-2 text-sm font-medium text-accent hover:underline">
             {guide.link.label} ↗
           </a>
         )}

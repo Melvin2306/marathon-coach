@@ -97,7 +97,8 @@ export function PaceRoadmap({ profile, plan, currentIndex }: { profile: Profile;
         <table className="tabular w-full min-w-[560px] text-sm">
           <thead>
             <tr className="text-left text-xs text-muted">
-              <th className="pb-2 font-normal" />
+              {/* The first column stays put while the phases scroll sideways on phones. */}
+              <th className="sticky left-0 z-10 bg-surface pb-2 font-normal" />
               {columns.map((c, i) => (
                 <th key={i} className={`pb-2 text-right font-normal ${i === columns.length - 1 && plan.goalVdot ? "text-accent" : ""}`}>
                   <div className="font-medium text-ink-2">{c.label}</div>
@@ -109,7 +110,7 @@ export function PaceRoadmap({ profile, plan, currentIndex }: { profile: Profile;
           <tbody className="divide-y divide-line">
             {PACE_KEYS.map((k) => (
               <tr key={k}>
-                <td className="py-2.5 pr-3 font-medium">{t(`pace.${k}.name`)}</td>
+                <td className="sticky left-0 z-10 bg-surface py-2.5 pr-3 font-medium">{t(`pace.${k}.name`)}</td>
                 {columns.map((c, i) => (
                   <td key={i} className={`py-2.5 text-right ${i === 0 ? "font-semibold" : "text-ink-2"}`}>
                     {paceLabel(c.vdot, k, units)}
@@ -118,7 +119,7 @@ export function PaceRoadmap({ profile, plan, currentIndex }: { profile: Profile;
               </tr>
             ))}
             <tr>
-              <td className="py-2.5 pr-3 text-ink-2">{t("roadmap.marathon")}</td>
+              <td className="sticky left-0 z-10 bg-surface py-2.5 pr-3 text-ink-2">{t("roadmap.marathon")}</td>
               {columns.map((c, i) => (
                 <td key={i} className="py-2.5 text-right text-ink-2">
                   {formatClock(predictTime(c.vdot, MARATHON))}

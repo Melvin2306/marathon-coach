@@ -93,7 +93,7 @@ export function LogView() {
                       <span className={`text-muted transition ${open === r.id ? "rotate-90" : ""}`} aria-hidden>
                         ›
                       </span>
-                      <button className="text-xs text-muted hover:text-warn" onClick={() => deleteRun(r.id)}>
+                      <button className="-my-2 px-1 py-2 text-xs text-muted hover:text-warn" onClick={() => confirm(t("log.deleteConfirm")) && deleteRun(r.id)}>
                         {t("log.delete")}
                       </button>
                     </div>
@@ -144,7 +144,7 @@ function LogForm({ profile, plan, prefill }: { profile: Profile; plan: Plan; pre
   return (
     <Card title={t("log.form.title")}>
       <form onSubmit={submit} className="space-y-4" onChange={() => setSaved(null)}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="run-date" className="mb-1.5 block text-sm font-medium">
               {t("log.form.date")}
@@ -190,7 +190,7 @@ function LogForm({ profile, plan, prefill }: { profile: Profile; plan: Plan; pre
               {rpe} · {t(`rpe.${rpe}` as MessageKey)}
             </span>
           </span>
-          <input type="range" min={1} max={10} value={rpe} onChange={(e) => setRpe(Number(e.target.value))} className="w-full accent-[var(--accent)]" />
+          <input type="range" min={1} max={10} value={rpe} onChange={(e) => setRpe(Number(e.target.value))} className="h-8 w-full accent-[var(--accent)]" />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">{t("log.form.notes")}</span>
