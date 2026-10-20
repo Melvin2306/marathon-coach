@@ -36,6 +36,8 @@ export const de: Record<keyof typeof en, string> = {
   "setup.import.doneNoVolume": "Deine aktuelle Form kommt jetzt aus diesen Läufen (siehe Aktuelle Form unten). Für Wochenumfang und längsten Lauf reichen sie noch nicht weit genug zurück: Prüf diese beiden Werte bitte.",
   "setup.import.noFitness": "Aus diesen Läufen lässt sich deine aktuelle Form noch nicht bestimmen: Dafür braucht es Läufe aus den letzten 8 Wochen. Trag sie bitte unten unter Aktuelle Form ein.",
   "setup.import.guides": "Wo bekomme ich meinen Export?",
+  "setup.import.keepTyping": "Du kannst das Formular unten schon weiter ausfüllen, während das läuft.",
+  "setup.import.waiting": "Import wird abgeschlossen … {percent} %",
 
   "phase.base.name": "Grundlage",
   "phase.base.short": "Grundlage",

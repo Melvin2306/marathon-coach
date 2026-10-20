@@ -8,7 +8,8 @@ import { useI18n } from "@/i18n/client";
 import type { MessageKey } from "@/i18n/translate";
 import { formatDate, todayISO } from "@/lib/dates";
 import { toRuns, type ImportSummary } from "@/lib/import/common";
-import { ImportError, importFiles, type Provider } from "@/lib/import/importer";
+import { ImportError, type Provider } from "@/lib/import/importer";
+import { importInBackground } from "@/lib/import/run-import";
 import { addRuns, saveHealthMetrics } from "@/lib/store";
 import type { Plan, RunSource } from "@/lib/types";
 import { DateField } from "./date-field";
@@ -34,6 +35,7 @@ export function ImportDropZone({
   setSince,
   onResult,
   onError,
+  onBusy,
   bare = false,
 }: {
   plan: Plan | null;
@@ -43,6 +45,8 @@ export function ImportDropZone({
   setSince?: (v: string) => void;
   onResult: (r: ImportOutcome) => void;
   onError: (k: MessageKey) => void;
+  /** progress while an import runs, null when it ends */
+  onBusy?: (progress: number | null) => void;
   /** without the surrounding card, e.g. inside another card */
   bare?: boolean;
 }) {
@@ -54,9 +58,14 @@ export function ImportDropZone({
 
   async function upload(files: File[]) {
     if (!files.length || progress !== null) return;
-    setProgress(0);
+    const report = (p: number | null) => {
+      setProgress(p);
+      onBusy?.(p);
+    };
+    report(0);
     try {
-      const imported = await importFiles(files, { since, onProgress: setProgress });
+      // Parsed in a worker, so the rest of the page stays usable meanwhile.
+      const imported = await importInBackground(files, { since, onProgress: report });
       saveHealthMetrics(imported.metrics);
       const runs = toRuns(imported.activities, plan, since);
       const summary = addRuns(runs);
@@ -73,7 +82,7 @@ export function ImportDropZone({
     } catch (e) {
       onError(e instanceof ImportError && e.reason === "unrecognized" ? "import.error.unrecognized" : "import.error.unreadable");
     } finally {
-      setProgress(null);
+      report(null);
       if (fileRef.current) fileRef.current.value = "";
     }
   }

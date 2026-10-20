@@ -96,6 +96,22 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
   const [form, setForm] = useState<FormState>(() => (profile ? fromProfile(profile) : defaults()));
   const [error, setError] = useState<string | null>(null);
   const [imported, setImported] = useState<ImportOutcome | null>(null);
+  // The form stays editable while an import runs in the background. Submitting
+  // meanwhile waits for it, so the plan is built from the imported runs.
+  const formRef = useRef<HTMLFormElement>(null);
+  const importing = useRef<{ running: boolean; ok: boolean; submitWhenDone: boolean }>({ running: false, ok: false, submitWhenDone: false });
+  const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [waitingForImport, setWaitingForImport] = useState(false);
+
+  function onImportBusy(progress: number | null) {
+    importing.current.running = progress !== null;
+    setImportProgress(progress);
+    if (progress !== null || !importing.current.submitWhenDone) return;
+    importing.current.submitWhenDone = false;
+    setWaitingForImport(false);
+    // After a failed import the runner sees the error first and decides.
+    if (importing.current.ok) setTimeout(() => formRef.current?.requestSubmit());
+  }
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const raceSeconds = parseClock(form.raceTime);
@@ -109,6 +125,11 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
 
   function submit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (importing.current.running) {
+      importing.current.submitWhenDone = true;
+      setWaitingForImport(true);
+      return;
+    }
     const today = todayISO();
     const u = unitLength(form.units);
     if (!fitnessFromRuns && (!raceSeconds || !vdot || vdot < 15 || vdot > 90)) return setError(t("settings.error.raceTime"));
@@ -141,9 +162,19 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
         <p className="mt-1 text-ink-2">{t("settings.subtitle")}</p>
       </div>
 
-      <form onSubmit={submit} className="space-y-6">
+      <form ref={formRef} onSubmit={submit} className="space-y-6">
         {/* Until there are recorded runs, offer them first: they answer the fitness questions below. */}
-        {(!fitnessFromRuns || imported) && <ImportFirst imported={imported} setImported={setImported} fitnessFromRuns={fitnessFromRuns} volumeFromRuns={volumeFromRuns} />}
+        {(!fitnessFromRuns || imported) && (
+          <ImportFirst
+            imported={imported}
+            setImported={setImported}
+            fitnessFromRuns={fitnessFromRuns}
+            volumeFromRuns={volumeFromRuns}
+            busy={importProgress !== null}
+            onBusy={onImportBusy}
+            onDone={(ok) => (importing.current.ok = ok)}
+          />
+        )}
 
         <Card title={t("settings.race")}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -284,8 +315,8 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
 
         {error && <p className="text-sm font-medium text-warn">{error}</p>}
         <div className="flex gap-3">
-          <button type="submit" className="btn-primary w-full sm:w-auto">
-            {profile ? t("settings.save") : t("settings.generate")}
+          <button type="submit" className="btn-primary w-full sm:w-auto" disabled={waitingForImport}>
+            {waitingForImport ? t("setup.import.waiting", { percent: Math.round((importProgress ?? 1) * 100) }) : profile ? t("settings.save") : t("settings.generate")}
           </button>
         </div>
       </form>
@@ -352,11 +383,17 @@ function ImportFirst({
   setImported,
   fitnessFromRuns,
   volumeFromRuns,
+  busy,
+  onBusy,
+  onDone,
 }: {
   imported: ImportOutcome | null;
   setImported: (r: ImportOutcome | null) => void;
   fitnessFromRuns: boolean;
   volumeFromRuns: boolean;
+  busy: boolean;
+  onBusy: (progress: number | null) => void;
+  onDone: (ok: boolean) => void;
 }) {
   const { t } = useI18n();
   const [error, setError] = useState<MessageKey | null>(null);
@@ -370,16 +407,20 @@ function ImportFirst({
           bare
           plan={null}
           since={since}
+          onBusy={onBusy}
           onResult={(r) => {
             setError(null);
             setImported(r);
+            onDone(true);
           }}
           onError={(k) => {
             setImported(null);
             setError(k);
+            onDone(false);
           }}
         />
       )}
+      {busy && <p className="mt-3 text-sm text-ink-2">{t("setup.import.keepTyping")}</p>}
       {imported && (
         <div className="mt-4 space-y-2">
           <ImportResultCard result={imported} since={since} />

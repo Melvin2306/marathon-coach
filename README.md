@@ -64,7 +64,7 @@ The name is the distance (42.195 km). The logo is an "M" drawn as a course profi
 ## Using M42 on the website
 
 1. Open **[m42.rinkleff.dev](https://m42.rinkleff.dev)** and choose **Build my plan**.
-2. **Start with your runs (optional, recommended).** Drop your export from Apple Health, Garmin, Strava or another watch or app (see [Importing your data](#importing-your-data)). M42 calculates your current fitness, weekly distance and longest run, and you skip those questions.
+2. **Start with your runs (optional, recommended).** Drop your export from Apple Health, Garmin, Strava or another watch or app (see [Importing your data](#importing-your-data)). M42 calculates your current fitness, weekly distance and longest run, and you skip those questions. You can keep filling in the form while the import runs.
 3. Enter your race and its date, and how many days a week you can run. Without imported runs, also give a recent race result (or your best guess), your weekly distance and your longest run.
 4. Choose **Generate my plan**. Your plan, paces and coaching are ready instantly.
 5. Log runs as you go, or import again later from **More → Import**. The same run is never counted twice.
@@ -155,7 +155,7 @@ Any other host that runs Next.js 16 works too: `npm run build && npm start`.
 
 ## Privacy and security
 
-- **No backend for user data.** Plans, runs and health metrics are stored only in the visitor's browser. Imports are read with streaming parsers in the browser (multi-GB Apple Health exports included), so health data never reaches a server.
+- **No backend for user data.** Plans, runs and health metrics are stored only in the visitor's browser. Imports are read with streaming parsers in a Web Worker in the browser (multi-GB Apple Health exports included), so health data never reaches a server and the page stays responsive meanwhile.
 - **Offline cache.** The service worker caches only the site's own pages, scripts and icons.
 - **Security headers.** All set in `next.config.ts`; the framework header is removed.
   - A strict Content-Security-Policy: everything from the site's own origin, no framing, no plugins.
@@ -273,6 +273,7 @@ src/
       apple-health.ts, garmin.ts, strava-csv.ts, polar.ts, oura.ts, whoop.ts, fitbit.ts
       fit.ts, activity-files.ts   FIT, GPX and TCX
       files.ts           streaming ZIP reader (nested ZIPs included)
+      import.worker.ts, run-import.ts   runs the import in a Web Worker (main-thread fallback)
   proxy.ts               redirects locale-less URLs to /en or /de
 public/sw.js             service worker for offline use
 tests/                   importer tests and export fixtures

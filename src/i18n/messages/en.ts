@@ -35,6 +35,8 @@ export const en = {
   "setup.import.doneNoVolume": "Your current fitness now comes from these runs (see Current fitness below). They don't go back far enough for your weekly distance and longest run yet, so please check those two values.",
   "setup.import.noFitness": "These runs can't tell your current fitness yet: that needs runs from the last 8 weeks. Please enter it under Current fitness below.",
   "setup.import.guides": "Where do I get my export?",
+  "setup.import.keepTyping": "You can keep filling in the form below while this runs.",
+  "setup.import.waiting": "Finishing import… {percent}%",
 
   "phase.base.name": "Base",
   "phase.base.short": "Base",
