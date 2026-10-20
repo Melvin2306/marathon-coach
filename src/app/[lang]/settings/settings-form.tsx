@@ -11,6 +11,7 @@ import { exportData, importData, resetData, saveProfile, useAppData } from "@/li
 import type { Experience, Profile, Run, RunSource, Units } from "@/lib/types";
 import { HALF, MARATHON, predictTime, vdotFromRace } from "@/lib/vdot";
 import { DateField } from "@/components/date-field";
+import { ImportDropZone, ImportGuides, ImportResultCard, type ImportOutcome } from "@/components/import-drop-zone";
 import { Card, Skeleton, Stat } from "@/components/ui";
 
 export const RACE_DISTANCES: { label: MessageKey; meters: number }[] = [
@@ -94,6 +95,7 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => (profile ? fromProfile(profile) : defaults()));
   const [error, setError] = useState<string | null>(null);
+  const [imported, setImported] = useState<ImportOutcome | null>(null);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const raceSeconds = parseClock(form.raceTime);
@@ -140,6 +142,9 @@ function Form({ profile, runs }: { profile: Profile | null; runs: Run[] }) {
       </div>
 
       <form onSubmit={submit} className="space-y-6">
+        {/* Until there are recorded runs, offer them first: they answer the fitness questions below. */}
+        {(!fitnessFromRuns || imported) && <ImportFirst imported={imported} setImported={setImported} fitnessFromRuns={fitnessFromRuns} volumeFromRuns={volumeFromRuns} />}
+
         <Card title={t("settings.race")}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("settings.raceName")}>
@@ -339,6 +344,65 @@ function DataCard() {
   );
 }
 
+const IMPORT_SINCE_DAYS = 365;
+
+/** Optional first step: import runs so fitness, weekly distance and longest run don't have to be typed in. */
+function ImportFirst({
+  imported,
+  setImported,
+  fitnessFromRuns,
+  volumeFromRuns,
+}: {
+  imported: ImportOutcome | null;
+  setImported: (r: ImportOutcome | null) => void;
+  fitnessFromRuns: boolean;
+  volumeFromRuns: boolean;
+}) {
+  const { t } = useI18n();
+  const [error, setError] = useState<MessageKey | null>(null);
+  // A year of history gives a reliable max heart rate for the fitness estimate.
+  const since = addDays(todayISO(), -IMPORT_SINCE_DAYS);
+  return (
+    <Card title={t("setup.import.title")}>
+      <p className="mb-4 text-sm text-ink-2">{t("setup.import.body")}</p>
+      {!fitnessFromRuns && (
+        <ImportDropZone
+          bare
+          plan={null}
+          since={since}
+          onResult={(r) => {
+            setError(null);
+            setImported(r);
+          }}
+          onError={(k) => {
+            setImported(null);
+            setError(k);
+          }}
+        />
+      )}
+      {imported && (
+        <div className="mt-4 space-y-2">
+          <ImportResultCard result={imported} since={since} />
+          <p className={`text-sm ${fitnessFromRuns ? "text-ink-2" : "font-medium text-warn"}`}>{t(!fitnessFromRuns ? "setup.import.noFitness" : volumeFromRuns ? "setup.import.done" : "setup.import.doneNoVolume")}</p>
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="mt-4 text-sm font-medium text-warn">
+          {t(error)}
+        </p>
+      )}
+      {!fitnessFromRuns && (
+        <details className="group mt-4">
+          <summary className="cursor-pointer list-none py-2 text-sm font-medium text-accent">{t("setup.import.guides")}</summary>
+          <div className="mt-2">
+            <ImportGuides heading={false} />
+          </div>
+        </details>
+      )}
+    </Card>
+  );
+}
+
 /** Current fitness as calculated from imported runs, with how it was derived. */
 function RecordedFitness({ fitness, runs, units }: { fitness: DerivedFitness; runs: Run[]; units: Units }) {
   const { t, locale } = useI18n();
@@ -349,10 +413,12 @@ function RecordedFitness({ fitness, runs, units }: { fitness: DerivedFitness; ru
   const source = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "file";
   const best = fitness.bestRun!;
   const bestParams = { dist: formatDistance(best.distance, units, 1, locale), time: formatClock(best.duration), date: { date: best.date } };
+  // "No heart-rate summaries" only when that's true, not when there are just too few of them yet.
+  const hasHeartRate = fitness.maxHr !== null || runs.some((r) => r.avgHr && r.source && r.source !== "manual");
   const explanation =
     fitness.method === "heart-rate"
       ? t("fitness.hr", { n: fitness.hrRuns, hr: fitness.maxHr ?? 0 })
-      : fitness.maxHr
+      : hasHeartRate
         ? t("fitness.best", bestParams)
         : t("fitness.bestNoHr", bestParams);
   return (

@@ -28,8 +28,14 @@ export const de: Record<keyof typeof en, string> = {
   "install.data": "Installiere M42 vor dem Import: Die App auf dem Home-Bildschirm hat eigene Daten, getrennt von Safari. Zum Übertragen nutze Einstellungen → Backup exportieren.",
 
   "setup.title": "Auf geht’s zur Startlinie",
-  "setup.body": "Erzähl dem Coach von deinem Rennen und deiner aktuellen Form. Du bekommst einen periodisierten Plan mit Trainingstempos, die zu dir passen – bis zum Renntag.",
+  "setup.body": "Erzähl dem Coach von deinem Rennen und importiere deine Läufe oder gib deine aktuelle Form an. Du bekommst einen periodisierten Plan mit Trainingstempos, die zu dir passen – bis zum Renntag.",
   "setup.cta": "Meinen Plan erstellen",
+  "setup.import.title": "Mit deinen Läufen starten (optional)",
+  "setup.import.body": "Importiere deinen Export aus Apple Health, Garmin, Strava oder von einer anderen Uhr oder App, und M42 ermittelt deine aktuelle Form, deinen Wochenumfang und deinen längsten Lauf. Diese Fragen kannst du dann überspringen.",
+  "setup.import.done": "Deine aktuelle Form, dein Wochenumfang und dein längster Lauf kommen jetzt aus diesen Läufen (siehe Aktuelle Form unten). Ergänze nur noch dein Rennen.",
+  "setup.import.doneNoVolume": "Deine aktuelle Form kommt jetzt aus diesen Läufen (siehe Aktuelle Form unten). Für Wochenumfang und längsten Lauf reichen sie noch nicht weit genug zurück: Prüf diese beiden Werte bitte.",
+  "setup.import.noFitness": "Aus diesen Läufen lässt sich deine aktuelle Form noch nicht bestimmen: Dafür braucht es Läufe aus den letzten 8 Wochen. Trag sie bitte unten unter Aktuelle Form ein.",
+  "setup.import.guides": "Wo bekomme ich meinen Export?",
 
   "phase.base.name": "Grundlage",
   "phase.base.short": "Grundlage",

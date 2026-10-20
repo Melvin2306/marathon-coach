@@ -64,15 +64,10 @@ The name is the distance (42.195 km). The logo is an "M" drawn as a course profi
 ## Using M42 on the website
 
 1. Open **[m42.rinkleff.dev](https://m42.rinkleff.dev)** and choose **Build my plan**.
-2. Enter:
-   - your race and its date
-   - a recent race result (or your best guess)
-   - your weekly distance
-   - how many days you can run
-
-   Your plan, paces and coaching are generated instantly.
-3. Optionally import your runs (see below). Your current fitness, weekly distance and longest run are then calculated from your real training.
-4. Log runs as you go, or import again later. The same run is never counted twice.
+2. **Start with your runs (optional, recommended).** Drop your export from Apple Health, Garmin, Strava or another watch or app (see [Importing your data](#importing-your-data)). M42 calculates your current fitness, weekly distance and longest run, and you skip those questions.
+3. Enter your race and its date, and how many days a week you can run. Without imported runs, also give a recent race result (or your best guess), your weekly distance and your longest run.
+4. Choose **Generate my plan**. Your plan, paces and coaching are ready instantly.
+5. Log runs as you go, or import again later from **More → Import**. The same run is never counted twice.
 
 ### Install it as an app
 

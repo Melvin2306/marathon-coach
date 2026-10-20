@@ -27,8 +27,14 @@ export const en = {
   "install.data": "Install it before importing: the home-screen app keeps its own data, separate from Safari. To move data across, use Settings → Export backup.",
 
   "setup.title": "Let's get you to the start line",
-  "setup.body": "Tell the coach about your race and current fitness. You'll get a periodised plan with paces matched to you, all the way to race day.",
+  "setup.body": "Tell the coach about your race, and import your runs or enter your current fitness. You'll get a periodised plan with paces matched to you, all the way to race day.",
   "setup.cta": "Build my plan",
+  "setup.import.title": "Start with your runs (optional)",
+  "setup.import.body": "Import your export from Apple Health, Garmin, Strava or any other watch or app, and M42 works out your current fitness, weekly distance and longest run. You can then skip those questions.",
+  "setup.import.done": "Your current fitness, weekly distance and longest run now come from these runs (see Current fitness below). Just add your race.",
+  "setup.import.doneNoVolume": "Your current fitness now comes from these runs (see Current fitness below). They don't go back far enough for your weekly distance and longest run yet, so please check those two values.",
+  "setup.import.noFitness": "These runs can't tell your current fitness yet: that needs runs from the last 8 weeks. Please enter it under Current fitness below.",
+  "setup.import.guides": "Where do I get my export?",
 
   "phase.base.name": "Base",
   "phase.base.short": "Base",
